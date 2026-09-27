@@ -1,0 +1,1595 @@
+/* Estilos visuais aplicados ao seletor `:root`. */
+:root {
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    color:#0d2147;
+    background:#f4f7fb;
+    font-synthesis:none;
+    text-rendering:optimizeLegibility;
+    --navy:#0b2244;
+    --blue:#246cf0;
+    --blue2:#2f7cf7;
+    --green:#0aa77a;
+    --red:#ef4444;
+    --yellow:#f4b83f;
+    --purple:#7654e8;
+    --line:#dfe7f2;
+    --muted:#657591;
+    --card:#fff
+}
+
+/* Estilos visuais aplicados ao seletor `*`. */
+* {
+    box-sizing:border-box
+}
+
+/* Estilos visuais aplicados ao seletor `body`. */
+body {
+    margin:0;
+    min-width:320px;
+    min-height:100vh;
+    background:#f4f7fb
+}
+
+/* Estilos visuais aplicados ao seletor `button,input,select,textarea`. */
+button,input,select,textarea {
+    font:inherit
+}
+
+/* Estilos visuais aplicados ao seletor `button`. */
+button {
+    cursor:pointer
+}
+
+/* Estilos visuais aplicados ao seletor `a`. */
+a {
+    text-decoration:none;
+    color:inherit
+}
+
+/* Estilos visuais aplicados ao seletor `.app-shell`. */
+.app-shell {
+    display:grid;
+    grid-template-columns:232px 1fr;
+    min-height:100vh
+}
+
+/* Estilos visuais aplicados ao seletor `.sidebar`. */
+.sidebar {
+    position:fixed;
+    inset:0 auto 0 0;
+    width:232px;
+    background:linear-gradient(180deg,#0b2244,#102b51);
+    color:#d8e5f6;
+    padding:18px 10px;
+    display:flex;
+    flex-direction:column;
+    z-index:30
+}
+
+/* Estilos visuais aplicados ao seletor `.brand`. */
+.brand {
+    display:flex;
+    align-items:center;
+    gap:13px;
+    border:0;
+    background:none;
+    color:#fff;
+    padding:5px 10px 21px;
+    font-size:23px
+}
+
+/* Estilos visuais aplicados ao seletor `.brand-bars`. */
+.brand-bars {
+    height:27px;
+    display:flex;
+    align-items:flex-end;
+    gap:3px
+}
+
+/* Estilos visuais aplicados ao seletor `.brand-bars i`. */
+.brand-bars i {
+    display:block;
+    width:5px;
+    border-radius:4px;
+    background:linear-gradient(#16dbc0,#2b71f6)
+}
+
+/* Estilos visuais aplicados ao seletor `.brand-bars i:nth-child(1)`. */
+.brand-bars i:nth-child(1) {
+    height:15px
+}
+
+/* Estilos visuais aplicados ao seletor `.brand-bars i:nth-child(2)`. */
+.brand-bars i:nth-child(2) {
+    height:22px
+}
+
+/* Estilos visuais aplicados ao seletor `.brand-bars i:nth-child(3)`. */
+.brand-bars i:nth-child(3) {
+    height:27px
+}
+
+/* Estilos visuais aplicados ao seletor `.sidebar nav`. */
+.sidebar nav {
+    display:flex;
+    flex-direction:column;
+    gap:5px
+}
+
+/* Estilos visuais aplicados ao seletor `.sidebar nav button`. */
+.sidebar nav button {
+    border:0;
+    background:transparent;
+    color:#c9d7ea;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:12px 13px;
+    border-radius:9px;
+    text-align:left;
+    font-size:14px
+}
+
+/* Estilos visuais aplicados ao seletor `.sidebar nav button:hover`. */
+.sidebar nav button:hover {
+    background:#17375f
+}
+
+/* Estilos visuais aplicados ao seletor `.sidebar nav button.active`. */
+.sidebar nav button.active {
+    background:linear-gradient(90deg,#1965dc,#286dd7);
+    color:white;
+    box-shadow:0 5px 18px rgba(0,60,150,.28)
+}
+
+/* Estilos visuais aplicados ao seletor `.version-box`. */
+.version-box {
+    margin-top:auto;
+    background:#17375f;
+    border:1px solid rgba(255,255,255,.07);
+    padding:14px;
+    border-radius:12px;
+    display:flex;
+    flex-direction:column;
+    gap:4px
+}
+
+/* Estilos visuais aplicados ao seletor `.version-box span`. */
+.version-box span {
+    color:#8fbcff;
+    font-weight:700
+}
+
+/* Estilos visuais aplicados ao seletor `.version-box small`. */
+.version-box small {
+    color:#afc3dd
+}
+
+/* Estilos visuais aplicados ao seletor `.workspace`. */
+.workspace {
+    grid-column:2;
+    min-width:0
+}
+
+/* Estilos visuais aplicados ao seletor `.topbar`. */
+.topbar {
+    height:70px;
+    position:sticky;
+    top:0;
+    z-index:20;
+    background:rgba(255,255,255,.96);
+    border-bottom:1px solid var(--line);
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:0 24px;
+    backdrop-filter:blur(12px)
+}
+
+/* Estilos visuais aplicados ao seletor `.company-select,.date-select`. */
+.company-select,.date-select {
+    height:40px;
+    border:1px solid var(--line);
+    background:white;
+    border-radius:8px;
+    display:flex;
+    align-items:center;
+    gap:9px;
+    padding:0 13px;
+    color:#14284c
+}
+
+/* Estilos visuais aplicados ao seletor `.company-select span:nth-child(2),.date-select span:nth-child(2)`. */
+.company-select span:nth-child(2),.date-select span:nth-child(2) {
+    font-weight:600
+}
+
+/* Estilos visuais aplicados ao seletor `.global-search`. */
+.global-search {
+    margin-left:auto;
+    max-width:500px;
+    flex:1;
+    height:40px;
+    background:#f5f8fc;
+    border:1px solid #e4eaf3;
+    border-radius:8px;
+    display:flex;
+    align-items:center;
+    gap:9px;
+    padding:0 12px;
+    color:#71819a
+}
+
+/* Estilos visuais aplicados ao seletor `.global-search input`. */
+.global-search input {
+    border:0;
+    outline:0;
+    background:transparent;
+    flex:1;
+    color:#1b3156
+}
+
+/* Estilos visuais aplicados ao seletor `.notification`. */
+.notification {
+    position:relative;
+    border:0;
+    background:transparent;
+    color:#213659;
+    padding:7px
+}
+
+/* Estilos visuais aplicados ao seletor `.notification b`. */
+.notification b {
+    position:absolute;
+    top:1px;
+    right:0;
+    background:#e83d49;
+    color:white;
+    border-radius:20px;
+    min-width:16px;
+    height:16px;
+    font-size:10px;
+    display:grid;
+    place-items:center
+}
+
+/* Estilos visuais aplicados ao seletor `.avatar`. */
+.avatar {
+    width:38px;
+    height:38px;
+    border-radius:50%;
+    background:#dbe8ff;
+    color:#154fa9;
+    display:grid;
+    place-items:center;
+    font-weight:800
+}
+
+/* Estilos visuais aplicados ao seletor `.profile`. */
+.profile {
+    display:flex;
+    flex-direction:column;
+    font-size:13px
+}
+
+/* Estilos visuais aplicados ao seletor `.profile small`. */
+.profile small {
+    color:#71819a
+}
+
+/* Estilos visuais aplicados ao seletor `main`. */
+main {
+    padding:22px 26px 44px;
+    max-width:1700px;
+    margin:auto
+}
+
+/* Estilos visuais aplicados ao seletor `.page-title`. */
+.page-title {
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-bottom:18px
+}
+
+/* Estilos visuais aplicados ao seletor `.page-title.actions`. */
+.page-title.actions {
+    gap:20px
+}
+
+/* Estilos visuais aplicados ao seletor `.page-title h1`. */
+.page-title h1 {
+    font-size:29px;
+    margin:0 0 3px;
+    letter-spacing:-.6px
+}
+
+/* Estilos visuais aplicados ao seletor `.page-title p`. */
+.page-title p {
+    margin:0;
+    color:var(--muted);
+    font-size:14px
+}
+
+/* Estilos visuais aplicados ao seletor `.title-line`. */
+.title-line {
+    display:flex;
+    align-items:center;
+    gap:10px
+}
+
+/* Estilos visuais aplicados ao seletor `.action-row`. */
+.action-row {
+    display:flex;
+    gap:9px
+}
+
+/* Estilos visuais aplicados ao seletor `.demo-pill`. */
+.demo-pill {
+    font-size:11px;
+    background:#fff5d9;
+    color:#9b6d00;
+    border:1px solid #f2daa1;
+    border-radius:20px;
+    padding:5px 8px;
+    display:inline-flex;
+    align-items:center;
+    gap:4px
+}
+
+/* Estilos visuais aplicados ao seletor `.card`. */
+.card {
+    background:var(--card);
+    border:1px solid #e1e8f1;
+    border-radius:12px;
+    box-shadow:0 2px 9px rgba(21,44,80,.035);
+    padding:16px;
+    min-width:0
+}
+
+/* Estilos visuais aplicados ao seletor `.card-head`. */
+.card-head {
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-bottom:11px;
+    gap:10px
+}
+
+/* Estilos visuais aplicados ao seletor `.card-head h3`. */
+.card-head h3 {
+    margin:0;
+    color:#10254a;
+    font-size:16px
+}
+
+/* Estilos visuais aplicados ao seletor `.card-head p`. */
+.card-head p {
+    margin:3px 0 0;
+    color:#7d8aa0;
+    font-size:12px
+}
+
+/* Estilos visuais aplicados ao seletor `.kpi-grid`. */
+.kpi-grid {
+    display:grid;
+    gap:10px;
+    margin-bottom:14px
+}
+
+/* Estilos visuais aplicados ao seletor `.kpi-grid.six`. */
+.kpi-grid.six {
+    grid-template-columns:repeat(6,minmax(0,1fr))
+}
+
+/* Estilos visuais aplicados ao seletor `.kpi-grid.five`. */
+.kpi-grid.five {
+    grid-template-columns:repeat(5,minmax(0,1fr))
+}
+
+/* Estilos visuais aplicados ao seletor `.kpi-grid.four`. */
+.kpi-grid.four {
+    grid-template-columns:repeat(4,minmax(0,1fr))
+}
+
+/* Estilos visuais aplicados ao seletor `.kpi`. */
+.kpi {
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+    padding:15px
+}
+
+/* Estilos visuais aplicados ao seletor `.kpi-icon`. */
+.kpi-icon {
+    width:38px;
+    height:38px;
+    border-radius:50%;
+    display:grid;
+    place-items:center;
+    flex:0 0 auto
+}
+
+/* Estilos visuais aplicados ao seletor `.tone-blue`. */
+.tone-blue {
+    color:#246cf0;
+    background:#e9f1ff
+}
+
+/* Estilos visuais aplicados ao seletor `.tone-green`. */
+.tone-green {
+    color:#06a779;
+    background:#e2f8f1
+}
+
+/* Estilos visuais aplicados ao seletor `.tone-red`. */
+.tone-red {
+    color:#e83d49;
+    background:#ffe9eb
+}
+
+/* Estilos visuais aplicados ao seletor `.tone-yellow`. */
+.tone-yellow {
+    color:#d99000;
+    background:#fff4d8
+}
+
+/* Estilos visuais aplicados ao seletor `.tone-purple`. */
+.tone-purple {
+    color:#7654e8;
+    background:#f0ebff
+}
+
+/* Estilos visuais aplicados ao seletor `.kpi>div:last-child`. */
+.kpi>div:last-child {
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    gap:4px
+}
+
+/* Estilos visuais aplicados ao seletor `.kpi-label`. */
+.kpi-label {
+    color:#566987;
+    font-size:13px
+}
+
+/* Estilos visuais aplicados ao seletor `.kpi strong`. */
+.kpi strong {
+    font-size:22px;
+    color:#0c2148;
+    white-space:nowrap
+}
+
+/* Estilos visuais aplicados ao seletor `.kpi small`. */
+.kpi small {
+    color:#7b899e;
+    font-size:11px
+}
+
+/* Estilos visuais aplicados ao seletor `.trend`. */
+.trend {
+    width:max-content;
+    font-size:11px;
+    font-weight:700;
+    border-radius:12px;
+    padding:3px 6px
+}
+
+/* Estilos visuais aplicados ao seletor `.trend.positive`. */
+.trend.positive {
+    color:#078b64;
+    background:#def7ed
+}
+
+/* Estilos visuais aplicados ao seletor `.trend.negative`. */
+.trend.negative {
+    color:#dc3343;
+    background:#ffe5e8
+}
+
+/* Estilos visuais aplicados ao seletor `.btn`. */
+.btn {
+    border:0;
+    border-radius:8px;
+    height:38px;
+    padding:0 14px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    font-weight:650;
+    font-size:13px;
+    white-space:nowrap
+}
+
+/* Estilos visuais aplicados ao seletor `.btn-primary`. */
+.btn-primary {
+    background:linear-gradient(180deg,#2c78f8,#1f68e8);
+    color:white;
+    box-shadow:0 4px 12px rgba(36,108,240,.2)
+}
+
+/* Estilos visuais aplicados ao seletor `.btn-secondary`. */
+.btn-secondary {
+    background:white;
+    color:#1b3156;
+    border:1px solid #d8e1ed
+}
+
+/* Estilos visuais aplicados ao seletor `.btn-success`. */
+.btn-success {
+    background:#08a678;
+    color:white
+}
+
+/* Estilos visuais aplicados ao seletor `.btn-danger`. */
+.btn-danger {
+    background:#fff1f2;
+    color:#d62e3d;
+    border:1px solid #f4bec4
+}
+
+/* Estilos visuais aplicados ao seletor `.btn-ghost`. */
+.btn-ghost {
+    background:#edf4ff;
+    color:#246cf0
+}
+
+/* Estilos visuais aplicados ao seletor `.btn:disabled`. */
+.btn:disabled {
+    opacity:.55;
+    cursor:not-allowed
+}
+
+/* Estilos visuais aplicados ao seletor `.filter-bar`. */
+.filter-bar {
+    background:#fff;
+    border:1px solid #e2e8f0;
+    border-radius:11px;
+    padding:10px;
+    display:grid;
+    grid-template-columns:repeat(4,minmax(150px,1fr));
+    gap:10px;
+    margin-bottom:13px
+}
+
+/* Estilos visuais aplicados ao seletor `.field`. */
+.field {
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+    min-width:0
+}
+
+/* Estilos visuais aplicados ao seletor `.field>span`. */
+.field>span {
+    font-size:11px;
+    font-weight:700;
+    color:#31496f
+}
+
+/* Estilos visuais aplicados ao seletor `.field input,.field select,.field textarea,.search-row input,.search-row select`. */
+.field input,.field select,.field textarea,.search-row input,.search-row select {
+    width:100%;
+    border:1px solid #dbe4ef;
+    background:white;
+    color:#193154;
+    border-radius:7px;
+    padding:9px 10px;
+    outline:none
+}
+
+/* Estilos visuais aplicados ao seletor `.field input:focus,.field select:focus,.field textarea:focus,.search-row input:focus`. */
+.field input:focus,.field select:focus,.field textarea:focus,.search-row input:focus {
+    border-color:#77a8ff;
+    box-shadow:0 0 0 3px #e8f1ff
+}
+
+/* Estilos visuais aplicados ao seletor `.dashboard-grid`. */
+.dashboard-grid {
+    display:grid;
+    grid-template-columns:1.7fr .85fr .88fr;
+    gap:12px;
+    margin-bottom:12px
+}
+
+/* Estilos visuais aplicados ao seletor `.span-2`. */
+.span-2 {
+    grid-column:span 2
+}
+
+/* Estilos visuais aplicados ao seletor `.two-col`. */
+.two-col {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+    margin:12px 0
+}
+
+/* Estilos visuais aplicados ao seletor `.reports-grid`. */
+.reports-grid {
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:12px;
+    margin-bottom:12px
+}
+
+/* Estilos visuais aplicados ao seletor `.master-detail`. */
+.master-detail {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 340px;
+    gap:12px;
+    margin:12px 0
+}
+
+/* Estilos visuais aplicados ao seletor `.receivable-charts`. */
+.receivable-charts {
+    display:grid;
+    grid-template-columns:1.5fr 1fr;
+    gap:12px;
+    margin:12px 0
+}
+
+/* Estilos visuais aplicados ao seletor `.cash-layout`. */
+.cash-layout {
+    display:grid;
+    grid-template-columns:minmax(0,2.4fr) minmax(280px,.7fr);
+    gap:12px;
+    margin:12px 0
+}
+
+/* Estilos visuais aplicados ao seletor `.cash-layout.lower`. */
+.cash-layout.lower {
+    align-items:start
+}
+
+/* Estilos visuais aplicados ao seletor `.projection-card`. */
+.projection-card {
+    margin-top:12px
+}
+
+/* Estilos visuais aplicados ao seletor `.table-scroll`. */
+.table-scroll {
+    width:100%;
+    overflow:auto
+}
+
+/* Estilos visuais aplicados ao seletor `.table-scroll table`. */
+.table-scroll table {
+    width:100%;
+    border-collapse:collapse;
+    font-size:12px
+}
+
+/* Estilos visuais aplicados ao seletor `.table-scroll th`. */
+.table-scroll th {
+    background:#f3f6fa;
+    color:#405576;
+    text-align:left;
+    padding:8px 9px;
+    white-space:nowrap;
+    font-weight:700
+}
+
+/* Estilos visuais aplicados ao seletor `.table-scroll td`. */
+.table-scroll td {
+    border-bottom:1px solid #edf1f5;
+    padding:9px;
+    color:#213756;
+    white-space:nowrap
+}
+
+/* Estilos visuais aplicados ao seletor `.table-scroll tr`. */
+.table-scroll tr {
+    cursor:default
+}
+
+/* Estilos visuais aplicados ao seletor `.table-scroll tbody tr:hover,.table-scroll tr.selected`. */
+.table-scroll tbody tr:hover,.table-scroll tr.selected {
+    background:#f0f6ff
+}
+
+/* Estilos visuais aplicados ao seletor `.table-scroll .num`. */
+.table-scroll .num {
+    text-align:right;
+    font-variant-numeric:tabular-nums
+}
+
+/* Estilos visuais aplicados ao seletor `.positive-text`. */
+.positive-text {
+    color:#0b9c71!important
+}
+
+/* Estilos visuais aplicados ao seletor `.negative-text`. */
+.negative-text {
+    color:#e33d4b!important
+}
+
+/* Estilos visuais aplicados ao seletor `.badge`. */
+.badge {
+    display:inline-flex;
+    align-items:center;
+    border-radius:15px;
+    padding:3px 8px;
+    font-size:11px;
+    font-weight:650
+}
+
+/* Estilos visuais aplicados ao seletor `.badge-success`. */
+.badge-success {
+    background:#ddf7ec;
+    color:#078d65
+}
+
+/* Estilos visuais aplicados ao seletor `.badge-danger`. */
+.badge-danger {
+    background:#ffe5e7;
+    color:#dc3543
+}
+
+/* Estilos visuais aplicados ao seletor `.badge-warning`. */
+.badge-warning {
+    background:#fff0cc;
+    color:#a46e00
+}
+
+/* Estilos visuais aplicados ao seletor `.badge-info`. */
+.badge-info {
+    background:#e4efff;
+    color:#2167d4
+}
+
+/* Estilos visuais aplicados ao seletor `.badge-neutral`. */
+.badge-neutral {
+    background:#edf1f5;
+    color:#5b687b
+}
+
+/* Estilos visuais aplicados ao seletor `.summary-list>div,.dre>div`. */
+.summary-list>div,.dre>div {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:9px 3px;
+    border-bottom:1px solid #edf1f5;
+    font-size:13px
+}
+
+/* Estilos visuais aplicados ao seletor `.summary-list .highlight,.dre .highlight`. */
+.summary-list .highlight,.dre .highlight {
+    background:#eaf2ff;
+    border-radius:7px;
+    padding:9px
+}
+
+/* Estilos visuais aplicados ao seletor `.alert-list`. */
+.alert-list {
+    display:flex;
+    flex-direction:column;
+    gap:7px
+}
+
+/* Estilos visuais aplicados ao seletor `.alert`. */
+.alert {
+    border:0;
+    text-align:left;
+    border-radius:8px;
+    padding:10px 11px;
+    display:flex;
+    flex-direction:column;
+    gap:2px
+}
+
+/* Estilos visuais aplicados ao seletor `.alert strong`. */
+.alert strong {
+    font-size:12px
+}
+
+/* Estilos visuais aplicados ao seletor `.alert span`. */
+.alert span {
+    font-size:11px;
+    color:#66758b
+}
+
+/* Estilos visuais aplicados ao seletor `.alert-danger`. */
+.alert-danger {
+    background:#fff0f1;
+    color:#cf2c3a
+}
+
+/* Estilos visuais aplicados ao seletor `.alert-warning`. */
+.alert-warning {
+    background:#fff6df;
+    color:#9c6b00
+}
+
+/* Estilos visuais aplicados ao seletor `.alert-info`. */
+.alert-info {
+    background:#eef5ff;
+    color:#1f65d1
+}
+
+/* Estilos visuais aplicados ao seletor `.alert-success`. */
+.alert-success {
+    background:#e7f9f2;
+    color:#078a63
+}
+
+/* Estilos visuais aplicados ao seletor `.link-button`. */
+.link-button {
+    border:0;
+    background:transparent;
+    color:#246cf0;
+    font-size:12px;
+    font-weight:700
+}
+
+/* Estilos visuais aplicados ao seletor `.bars-chart`. */
+.bars-chart {
+    height:240px;
+    position:relative;
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-around;
+    gap:7px;
+    padding:18px 12px 26px;
+    border-bottom:1px solid #dce5ef
+}
+
+/* Estilos visuais aplicados ao seletor `.chart-grid`. */
+.chart-grid {
+    position:absolute;
+    inset:12px 0 25px;
+    background:repeating-linear-gradient(to bottom,transparent 0,transparent 48px,#edf1f5 49px,#edf1f5 50px);
+    pointer-events:none
+}
+
+/* Estilos visuais aplicados ao seletor `.bar-group`. */
+.bar-group {
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:flex-end;
+    min-width:50px;
+    flex:1;
+    z-index:1
+}
+
+/* Estilos visuais aplicados ao seletor `.bar-pair`. */
+.bar-pair {
+    height:88%;
+    display:flex;
+    align-items:flex-end;
+    gap:4px
+}
+
+/* Estilos visuais aplicados ao seletor `.bar`. */
+.bar {
+    width:18px;
+    border-radius:3px 3px 0 0;
+    display:block
+}
+
+/* Estilos visuais aplicados ao seletor `.bar.a`. */
+.bar.a {
+    background:#21af85
+}
+
+/* Estilos visuais aplicados ao seletor `.bar.b`. */
+.bar.b {
+    background:#f05258
+}
+
+/* Estilos visuais aplicados ao seletor `.bar-group span`. */
+.bar-group span {
+    font-size:10px;
+    color:#657591;
+    margin-top:7px
+}
+
+/* Estilos visuais aplicados ao seletor `.chart-legend`. */
+.chart-legend {
+    font-size:11px;
+    color:#61718c;
+    display:flex;
+    align-items:center;
+    gap:5px
+}
+
+/* Estilos visuais aplicados ao seletor `.chart-legend i`. */
+.chart-legend i {
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    display:inline-block
+}
+
+/* Estilos visuais aplicados ao seletor `.chart-legend .green`. */
+.chart-legend .green {
+    background:#17ad82
+}
+
+/* Estilos visuais aplicados ao seletor `.chart-legend .red`. */
+.chart-legend .red {
+    background:#f05258
+}
+
+/* Estilos visuais aplicados ao seletor `.donut-wrap`. */
+.donut-wrap {
+    display:flex;
+    align-items:center;
+    gap:24px;
+    min-height:220px;
+    justify-content:center
+}
+
+/* Estilos visuais aplicados ao seletor `.donut`. */
+.donut {
+    width:142px;
+    height:142px;
+    border-radius:50%;
+    position:relative;
+    display:grid;
+    place-items:center
+}
+
+/* Estilos visuais aplicados ao seletor `.donut:after`. */
+.donut:after {
+    content:"";
+    position:absolute;
+    width:87px;
+    height:87px;
+    border-radius:50%;
+    background:white
+}
+
+/* Estilos visuais aplicados ao seletor `.donut>div`. */
+.donut>div {
+    z-index:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    font-size:11px
+}
+
+/* Estilos visuais aplicados ao seletor `.donut>div strong`. */
+.donut>div strong {
+    font-size:13px
+}
+
+/* Estilos visuais aplicados ao seletor `.donut>div small`. */
+.donut>div small {
+    color:#7b899e
+}
+
+/* Estilos visuais aplicados ao seletor `.legend`. */
+.legend {
+    min-width:170px
+}
+
+/* Estilos visuais aplicados ao seletor `.legend>div`. */
+.legend>div {
+    display:grid;
+    grid-template-columns:10px 1fr auto;
+    gap:6px;
+    align-items:center;
+    padding:4px 0;
+    font-size:11px
+}
+
+/* Estilos visuais aplicados ao seletor `.legend i`. */
+.legend i {
+    width:8px;
+    height:8px;
+    border-radius:50%
+}
+
+/* Estilos visuais aplicados ao seletor `.legend b`. */
+.legend b {
+    font-size:10px
+}
+
+/* Estilos visuais aplicados ao seletor `.line-chart`. */
+.line-chart {
+    height:270px;
+    background:repeating-linear-gradient(to bottom,#fff 0,#fff 52px,#edf2f7 53px,#edf2f7 54px);
+    padding:10px
+}
+
+/* Estilos visuais aplicados ao seletor `.line-chart svg`. */
+.line-chart svg {
+    width:100%;
+    height:100%;
+    overflow:visible
+}
+
+/* Estilos visuais aplicados ao seletor `.mini-axis`. */
+.mini-axis {
+    display:flex;
+    justify-content:space-between;
+    color:#75849a;
+    font-size:10px;
+    padding:0 18px
+}
+
+/* Estilos visuais aplicados ao seletor `.status-bars`. */
+.status-bars {
+    display:flex;
+    flex-direction:column;
+    gap:17px;
+    padding:16px 2px
+}
+
+/* Estilos visuais aplicados ao seletor `.status-bars>div`. */
+.status-bars>div {
+    display:grid;
+    grid-template-columns:85px 1fr 30px;
+    align-items:center;
+    gap:8px;
+    font-size:12px
+}
+
+/* Estilos visuais aplicados ao seletor `.status-bars i`. */
+.status-bars i {
+    height:9px;
+    background:#edf1f6;
+    border-radius:10px;
+    overflow:hidden
+}
+
+/* Estilos visuais aplicados ao seletor `.status-bars i b`. */
+.status-bars i b {
+    height:100%;
+    display:block;
+    background:#2f73f6;
+    border-radius:10px
+}
+
+/* Estilos visuais aplicados ao seletor `.status-bars>div:nth-child(2) i b`. */
+.status-bars>div:nth-child(2) i b {
+    background:#16a985
+}
+
+/* Estilos visuais aplicados ao seletor `.status-bars>div:nth-child(3) i b`. */
+.status-bars>div:nth-child(3) i b {
+    background:#ef4b55
+}
+
+/* Estilos visuais aplicados ao seletor `.status-bars>div:nth-child(4) i b`. */
+.status-bars>div:nth-child(4) i b {
+    background:#94a3b8
+}
+
+/* Estilos visuais aplicados ao seletor `.detail-panel`. */
+.detail-panel {
+    font-size:12px
+}
+
+/* Estilos visuais aplicados ao seletor `.detail-title`. */
+.detail-title {
+    display:flex;
+    justify-content:space-between;
+    gap:9px;
+    padding-bottom:14px;
+    border-bottom:1px solid #e8edf3
+}
+
+/* Estilos visuais aplicados ao seletor `.detail-title>div`. */
+.detail-title>div {
+    display:flex;
+    flex-direction:column;
+    gap:4px
+}
+
+/* Estilos visuais aplicados ao seletor `.detail-title strong`. */
+.detail-title strong {
+    font-size:16px
+}
+
+/* Estilos visuais aplicados ao seletor `.detail-title span`. */
+.detail-title span {
+    color:#70809a
+}
+
+/* Estilos visuais aplicados ao seletor `.detail-panel dl`. */
+.detail-panel dl {
+    display:grid;
+    grid-template-columns:1fr 1.2fr;
+    gap:10px;
+    margin:15px 0
+}
+
+/* Estilos visuais aplicados ao seletor `.detail-panel dt`. */
+.detail-panel dt {
+    color:#63738c
+}
+
+/* Estilos visuais aplicados ao seletor `.detail-panel dd`. */
+.detail-panel dd {
+    margin:0;
+    color:#1a3154;
+    font-weight:600
+}
+
+/* Estilos visuais aplicados ao seletor `.detail-actions`. */
+.detail-actions {
+    display:flex;
+    gap:8px;
+    margin-top:12px
+}
+
+/* Estilos visuais aplicados ao seletor `.form-grid`. */
+.form-grid {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px
+}
+
+/* Estilos visuais aplicados ao seletor `.form-grid .form-actions`. */
+.form-grid .form-actions {
+    grid-column:1/-1;
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+    padding-top:8px
+}
+
+/* Estilos visuais aplicados ao seletor `.form-grid textarea`. */
+.form-grid textarea {
+    resize:vertical
+}
+
+/* Estilos visuais aplicados ao seletor `.modal-backdrop`. */
+.modal-backdrop {
+    position:fixed;
+    inset:0;
+    background:rgba(2,13,32,.48);
+    z-index:80;
+    display:grid;
+    place-items:center;
+    padding:20px
+}
+
+/* Estilos visuais aplicados ao seletor `.modal`. */
+.modal {
+    width:min(720px,96vw);
+    max-height:90vh;
+    overflow:auto;
+    background:white;
+    border-radius:14px;
+    padding:20px;
+    box-shadow:0 28px 90px rgba(0,0,0,.28)
+}
+
+/* Estilos visuais aplicados ao seletor `.modal-head`. */
+.modal-head {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:17px
+}
+
+/* Estilos visuais aplicados ao seletor `.modal-head h2`. */
+.modal-head h2 {
+    font-size:20px;
+    margin:0
+}
+
+/* Estilos visuais aplicados ao seletor `.modal-head button`. */
+.modal-head button {
+    border:0;
+    background:#f0f3f7;
+    border-radius:7px;
+    width:34px;
+    height:34px;
+    display:grid;
+    place-items:center
+}
+
+/* Estilos visuais aplicados ao seletor `.projection-list>div`. */
+.projection-list>div {
+    display:grid;
+    grid-template-columns:1fr auto auto;
+    gap:9px;
+    padding:12px 0;
+    border-bottom:1px solid #edf1f5;
+    font-size:12px
+}
+
+/* Estilos visuais aplicados ao seletor `.projection-list small`. */
+.projection-list small {
+    color:#08956c;
+    background:#e3f8ef;
+    border-radius:12px;
+    padding:2px 5px
+}
+
+/* Estilos visuais aplicados ao seletor `.info-note`. */
+.info-note {
+    margin-top:13px;
+    background:#edf5ff;
+    color:#476282;
+    border-radius:8px;
+    padding:11px;
+    font-size:11px;
+    line-height:1.45
+}
+
+/* Estilos visuais aplicados ao seletor `.report-tabs`. */
+.report-tabs {
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:8px;
+    margin-bottom:10px
+}
+
+/* Estilos visuais aplicados ao seletor `.report-tabs button`. */
+.report-tabs button {
+    background:white;
+    border:1px solid #e1e8f1;
+    border-radius:9px;
+    min-height:60px;
+    padding:9px 11px;
+    text-align:left;
+    color:#173054;
+    font-weight:700
+}
+
+/* Estilos visuais aplicados ao seletor `.report-tabs button small`. */
+.report-tabs button small {
+    display:block;
+    color:#7a889e;
+    margin-top:3px;
+    font-weight:400
+}
+
+/* Estilos visuais aplicados ao seletor `.report-tabs button.active`. */
+.report-tabs button.active {
+    border-color:#3678ef;
+    box-shadow:0 0 0 1px #3678ef inset;
+    background:#f8fbff;
+    color:#1f66dd
+}
+
+/* Estilos visuais aplicados ao seletor `.report-filter`. */
+.report-filter {
+    grid-template-columns:1.1fr .9fr 1fr 1fr auto auto
+}
+
+/* Estilos visuais aplicados ao seletor `.registry-tabs`. */
+.registry-tabs {
+    display:flex;
+    background:white;
+    border:1px solid #e1e8f1;
+    border-radius:9px;
+    overflow:auto;
+    margin-bottom:12px
+}
+
+/* Estilos visuais aplicados ao seletor `.registry-tabs button`. */
+.registry-tabs button {
+    flex:1;
+    min-width:120px;
+    border:0;
+    background:white;
+    padding:12px;
+    color:#526684;
+    border-bottom:2px solid transparent
+}
+
+/* Estilos visuais aplicados ao seletor `.registry-tabs button.active`. */
+.registry-tabs button.active {
+    color:#246cf0;
+    border-bottom-color:#246cf0;
+    font-weight:700
+}
+
+/* Estilos visuais aplicados ao seletor `.search-row`. */
+.search-row {
+    display:grid;
+    grid-template-columns:1fr 170px;
+    gap:8px;
+    margin-bottom:10px
+}
+
+/* Estilos visuais aplicados ao seletor `.detail-form-preview`. */
+.detail-form-preview {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px
+}
+
+/* Estilos visuais aplicados ao seletor `.detail-form-preview .field:nth-last-child(2)`. */
+.detail-form-preview .field:nth-last-child(2) {
+    grid-column:1/-1
+}
+
+/* Estilos visuais aplicados ao seletor `.detail-form-preview .detail-actions`. */
+.detail-form-preview .detail-actions {
+    grid-column:1/-1;
+    justify-content:flex-end
+}
+
+/* Estilos visuais aplicados ao seletor `.import-row`. */
+.import-row {
+    display:flex;
+    align-items:flex-end;
+    gap:10px
+}
+
+/* Estilos visuais aplicados ao seletor `.import-row .field`. */
+.import-row .field {
+    min-width:330px
+}
+
+/* Estilos visuais aplicados ao seletor `.file-btn`. */
+.file-btn {
+    position:relative;
+    overflow:hidden
+}
+
+/* Estilos visuais aplicados ao seletor `.file-btn input`. */
+.file-btn input {
+    position:absolute;
+    opacity:0;
+    inset:0;
+    cursor:pointer
+}
+
+/* Estilos visuais aplicados ao seletor `.backup-actions`. */
+.backup-actions {
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    gap:10px
+}
+
+/* Estilos visuais aplicados ao seletor `.check-list`. */
+.check-list {
+    margin:0;
+    padding:0 0 0 20px;
+    color:#50627d;
+    line-height:2
+}
+
+/* Estilos visuais aplicados ao seletor `.empty`. */
+.empty {
+    min-height:120px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    color:#8190a4
+}
+
+/* Estilos visuais aplicados ao seletor `.icon`. */
+.icon {
+    display:block
+}
+
+/* Estilos visuais aplicados ao seletor `.action-row,.detail-actions`. */
+.action-row,.detail-actions {
+    flex-wrap:wrap
+}
+
+@media (max-width:1280px) {
+    /* Estilos visuais aplicados ao seletor `.kpi-grid.six`. */
+    .kpi-grid.six {
+        grid-template-columns:repeat(3,1fr)
+    }
+
+    /* Estilos visuais aplicados ao seletor `.kpi-grid.five`. */
+    .kpi-grid.five {
+        grid-template-columns:repeat(3,1fr)
+    }
+
+    /* Estilos visuais aplicados ao seletor `.dashboard-grid`. */
+    .dashboard-grid {
+        grid-template-columns:1.5fr 1fr
+    }
+
+    /* Estilos visuais aplicados ao seletor `.dashboard-grid .span-2`. */
+    .dashboard-grid .span-2 {
+        grid-column:span 1
+    }
+
+    /* Estilos visuais aplicados ao seletor `.reports-grid`. */
+    .reports-grid {
+        grid-template-columns:1fr 1fr
+    }
+
+    /* Estilos visuais aplicados ao seletor `.master-detail`. */
+    .master-detail {
+        grid-template-columns:minmax(0,1fr) 320px
+    }
+
+    /* Estilos visuais aplicados ao seletor `.report-tabs`. */
+    .report-tabs {
+        grid-template-columns:repeat(3,1fr)
+    }
+
+    /* Estilos visuais aplicados ao seletor `.report-filter`. */
+    .report-filter {
+        grid-template-columns:repeat(3,1fr)
+    }
+
+    /* Estilos visuais aplicados ao seletor `.global-search`. */
+    .global-search {
+        max-width:300px
+    }
+
+    /* Estilos visuais aplicados ao seletor `.profile`. */
+    .profile {
+        display:none
+    }
+
+}
+
+@media (max-width:980px) {
+    /* Estilos visuais aplicados ao seletor `.app-shell`. */
+    .app-shell {
+        grid-template-columns:78px 1fr
+    }
+
+    /* Estilos visuais aplicados ao seletor `.sidebar`. */
+    .sidebar {
+        width:78px
+    }
+
+    /* Estilos visuais aplicados ao seletor `.brand b,.sidebar nav span,.version-box`. */
+    .brand b,.sidebar nav span,.version-box {
+        display:none
+    }
+
+    /* Estilos visuais aplicados ao seletor `.brand`. */
+    .brand {
+        justify-content:center;
+        padding-left:0;
+        padding-right:0
+    }
+
+    /* Estilos visuais aplicados ao seletor `.sidebar nav button`. */
+    .sidebar nav button {
+        justify-content:center
+    }
+
+    /* Estilos visuais aplicados ao seletor `.workspace`. */
+    .workspace {
+        grid-column:2
+    }
+
+    /* Estilos visuais aplicados ao seletor `.topbar`. */
+    .topbar {
+        padding:0 12px
+    }
+
+    /* Estilos visuais aplicados ao seletor `.company-select span:nth-child(2),.date-select`. */
+    .company-select span:nth-child(2),.date-select {
+        display:none
+    }
+
+    /* Estilos visuais aplicados ao seletor `.global-search`. */
+    .global-search {
+        max-width:none
+    }
+
+    /* Estilos visuais aplicados ao seletor `.kpi-grid.four,.kpi-grid.five,.kpi-grid.six`. */
+    .kpi-grid.four,.kpi-grid.five,.kpi-grid.six {
+        grid-template-columns:repeat(2,1fr)
+    }
+
+    /* Estilos visuais aplicados ao seletor `.dashboard-grid,.cash-layout,.reports-grid,.two-col,.receivable-charts,.master-detail`. */
+    .dashboard-grid,.cash-layout,.reports-grid,.two-col,.receivable-charts,.master-detail {
+        grid-template-columns:1fr
+    }
+
+    /* Estilos visuais aplicados ao seletor `.span-2`. */
+    .span-2 {
+        grid-column:auto
+    }
+
+    /* Estilos visuais aplicados ao seletor `.filter-bar,.report-filter`. */
+    .filter-bar,.report-filter {
+        grid-template-columns:repeat(2,1fr)
+    }
+
+    /* Estilos visuais aplicados ao seletor `.detail-form-preview`. */
+    .detail-form-preview {
+        grid-template-columns:1fr
+    }
+
+    /* Estilos visuais aplicados ao seletor `.form-grid`. */
+    .form-grid {
+        grid-template-columns:1fr
+    }
+
+    /* Estilos visuais aplicados ao seletor `.form-grid .form-actions`. */
+    .form-grid .form-actions {
+        grid-column:auto
+    }
+
+    /* Estilos visuais aplicados ao seletor `.report-tabs`. */
+    .report-tabs {
+        grid-template-columns:repeat(2,1fr)
+    }
+
+}
+
+@media (max-width:620px) {
+    /* Estilos visuais aplicados ao seletor `main`. */
+    main {
+        padding:14px
+    }
+
+    /* Estilos visuais aplicados ao seletor `.topbar`. */
+    .topbar {
+        height:60px
+    }
+
+    /* Estilos visuais aplicados ao seletor `.company-select`. */
+    .company-select {
+        display:none
+    }
+
+    /* Estilos visuais aplicados ao seletor `.global-search input`. */
+    .global-search input {
+        min-width:0
+    }
+
+    /* Estilos visuais aplicados ao seletor `.kpi-grid.four,.kpi-grid.five,.kpi-grid.six`. */
+    .kpi-grid.four,.kpi-grid.five,.kpi-grid.six {
+        grid-template-columns:1fr
+    }
+
+    /* Estilos visuais aplicados ao seletor `.filter-bar,.report-filter`. */
+    .filter-bar,.report-filter {
+        grid-template-columns:1fr
+    }
+
+    /* Estilos visuais aplicados ao seletor `.page-title,.page-title.actions`. */
+    .page-title,.page-title.actions {
+        flex-direction:column;
+        gap:12px
+    }
+
+    /* Estilos visuais aplicados ao seletor `.report-tabs`. */
+    .report-tabs {
+        grid-template-columns:1fr
+    }
+
+    /* Estilos visuais aplicados ao seletor `.donut-wrap`. */
+    .donut-wrap {
+        flex-direction:column
+    }
+
+    /* Estilos visuais aplicados ao seletor `.import-row`. */
+    .import-row {
+        flex-direction:column;
+        align-items:stretch
+    }
+
+    /* Estilos visuais aplicados ao seletor `.import-row .field`. */
+    .import-row .field {
+        min-width:0
+    }
+
+    /* Estilos visuais aplicados ao seletor `.sidebar`. */
+    .sidebar {
+        width:62px;
+        padding-left:4px;
+        padding-right:4px
+    }
+
+    /* Estilos visuais aplicados ao seletor `.app-shell`. */
+    .app-shell {
+        grid-template-columns:62px 1fr
+    }
+
+    /* Estilos visuais aplicados ao seletor `.profile,.avatar`. */
+    .profile,.avatar {
+        display:none
+    }
+
+}

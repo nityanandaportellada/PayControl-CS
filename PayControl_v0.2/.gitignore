@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+.vs/
+.vscode/
+*.user
+*.suo
+contas.db
+contas.db-shm
+contas.db-wal
+**/node_modules/
+**/dist/
+.env
