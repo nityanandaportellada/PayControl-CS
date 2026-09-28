@@ -9,7 +9,7 @@ namespace PayControl.Api.Services;
 // Declara `CadastrosService`, que representa uma parte do domínio do PayControl.
 public sealed class CadastrosService(DatabaseService db)
 {
-    // Define o método `V` e sua responsabilidade no fluxo da aplicação.
+    // Define o metodo `V` e sua responsabilidade no fluxo da aplicação.
     static object V(SqliteDataReader r,int i)=>r.IsDBNull(i)?DBNull.Value:r.GetValue(i);
     // Define o método `ListarEmpresasAsync` e sua responsabilidade no fluxo da aplicação.
     public async Task<IReadOnlyList<Empresa>> ListarEmpresasAsync()
