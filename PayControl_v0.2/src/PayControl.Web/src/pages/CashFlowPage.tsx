@@ -4,6 +4,10 @@ import {
     useState
 } from 'react';
 
+import type {
+    FormEvent
+} from 'react';
+
 import {
     api,
     loadWithFallback
@@ -21,35 +25,44 @@ import {
 
 import type {
     ContaFinanceira,
-    Fluxo
+    Fluxo,
+    Transferencia
 } from '../types';
 
 import {
     Badge,
+    Button,
     Card,
     DemoPill,
+    EmptyState,
     Field,
     Kpi,
     LineChart,
+    Modal,
     dateBR,
     money,
     statusTone
 } from '../components/UI';
 
 
+const hoje =
+    () =>
+        new Date()
+            .toISOString()
+            .slice(
+                0,
+                10
+            );
+
+
 export default function CashFlowPage() {
-    /*
-     * Empresa atualmente selecionada.
-     */
     const {
-        empresaAtiva
+        empresaAtiva,
+        empresaAtivaId
     } =
         useCompany();
 
 
-    /*
-     * Fluxo financeiro.
-     */
     const [
         fluxo,
         setFluxo
@@ -59,9 +72,6 @@ export default function CashFlowPage() {
         );
 
 
-    /*
-     * Contas financeiras.
-     */
     const [
         contas,
         setContas
@@ -69,13 +79,21 @@ export default function CashFlowPage() {
         useState<
             ContaFinanceira[]
         >(
-            mockContasFinanceiras
+            []
         );
 
 
-    /*
-     * Indicador de modo demo.
-     */
+    const [
+        transferencias,
+        setTransferencias
+    ] =
+        useState<
+            Transferencia[]
+        >(
+            []
+        );
+
+
     const [
         demo,
         setDemo
@@ -85,10 +103,6 @@ export default function CashFlowPage() {
         );
 
 
-    /*
-     * Conta financeira escolhida
-     * para filtrar o extrato.
-     */
     const [
         account,
         setAccount
@@ -98,26 +112,43 @@ export default function CashFlowPage() {
         );
 
 
+    const [
+        openTransferencia,
+        setOpenTransferencia
+    ] =
+        useState(
+            false
+        );
+
+
+    const [
+        busy,
+        setBusy
+    ] =
+        useState(
+            false
+        );
+
+
     /*
-     * Carrega fluxo e contas.
-     *
-     * empresaId é incluído automaticamente
-     * pelo api.ts.
+     * Carrega fluxo, contas e transferências.
      */
     async function load(
-        id = ''
+        contaFinanceiraId =
+            account
     ) {
         const suffix =
-            id
+            contaFinanceiraId
 
-                ? `?contaFinanceiraId=${id}`
+                ? `?contaFinanceiraId=${contaFinanceiraId}`
 
                 : '';
 
 
         const [
             fluxoResult,
-            contasResult
+            contasResult,
+            transferenciasResult
         ] =
             await Promise.all([
                 loadWithFallback(
@@ -139,7 +170,29 @@ export default function CashFlowPage() {
                             '/api/contas-financeiras'
                         ),
 
-                    mockContasFinanceiras
+                    mockContasFinanceiras.filter(
+                        item =>
+                            (
+                                !empresaAtivaId
+                                ||
+                                item.empresaId
+                                ===
+                                empresaAtivaId
+                            )
+                            &&
+                            item.ativa
+                    )
+                ),
+
+                loadWithFallback(
+                    () =>
+                        api.get<
+                            Transferencia[]
+                        >(
+                            `/api/transferencias${suffix}`
+                        ),
+
+                    [] as Transferencia[]
                 )
             ]);
 
@@ -150,38 +203,50 @@ export default function CashFlowPage() {
 
 
         setContas(
-            contasResult.data
+            contasResult
+                .data
+                .filter(
+                    item =>
+                        item.ativa
+                )
+        );
+
+
+        setTransferencias(
+            transferenciasResult.data
         );
 
 
         setDemo(
-            fluxoResult.demo ||
+            fluxoResult.demo
+            ||
             contasResult.demo
+            ||
+            transferenciasResult.demo
         );
     }
 
 
-    /*
-     * Carrega ao abrir a página.
-     */
-    useEffect(() => {
-        void load();
-    }, []);
+    useEffect(
+        () => {
+            void load(
+                ''
+            );
+        },
+
+        []
+    );
 
 
-    /*
-     * Pontos do gráfico.
-     */
     const points =
         useMemo(
             () =>
                 fluxo.lancamentos.length
 
-                    ? fluxo.lancamentos
-                        .map(
-                            item =>
-                                item.saldo
-                        )
+                    ? fluxo.lancamentos.map(
+                        item =>
+                            item.saldo
+                    )
 
                     : [
                         8200,
@@ -197,6 +262,238 @@ export default function CashFlowPage() {
                 fluxo
             ]
         );
+
+
+    const nomeConta =
+        (
+            id:
+                number
+        ) =>
+            contas.find(
+                conta =>
+                    conta.id
+                    ===
+                    id
+            )
+            ?.nome
+            ??
+            `Conta ${id}`;
+
+
+    /*
+     * Cria transferência.
+     */
+    async function criarTransferencia(
+        event:
+            FormEvent<
+                HTMLFormElement
+            >
+    ) {
+        event.preventDefault();
+
+
+        if (
+            !empresaAtivaId
+        )
+        {
+            alert(
+                'Selecione uma empresa antes de realizar uma transferência.'
+            );
+
+            return;
+        }
+
+
+        const form =
+            new FormData(
+                event.currentTarget
+            );
+
+
+        const origem =
+            Number(
+                form.get(
+                    'contaOrigemId'
+                )
+            );
+
+
+        const destino =
+            Number(
+                form.get(
+                    'contaDestinoId'
+                )
+            );
+
+
+        const valor =
+            Number(
+                form.get(
+                    'valor'
+                )
+            );
+
+
+        if (
+            !origem
+            ||
+            !destino
+        )
+        {
+            alert(
+                'Selecione a conta de origem e a conta de destino.'
+            );
+
+            return;
+        }
+
+
+        if (
+            origem
+            ===
+            destino
+        )
+        {
+            alert(
+                'A conta de origem deve ser diferente da conta de destino.'
+            );
+
+            return;
+        }
+
+
+        if (
+            valor <= 0
+        )
+        {
+            alert(
+                'Informe um valor maior que zero.'
+            );
+
+            return;
+        }
+
+
+        setBusy(
+            true
+        );
+
+
+        try {
+            await api.post(
+                '/api/transferencias',
+
+                {
+                    empresaId:
+                        empresaAtivaId,
+
+                    contaOrigemId:
+                        origem,
+
+                    contaDestinoId:
+                        destino,
+
+                    valor,
+
+                    data:
+                        String(
+                            form.get(
+                                'data'
+                            )
+                            ||
+                            hoje()
+                        ),
+
+                    descricao:
+                        String(
+                            form.get(
+                                'descricao'
+                            )
+                            ||
+                            ''
+                        )
+                }
+            );
+
+
+            setOpenTransferencia(
+                false
+            );
+
+
+            await load();
+        }
+        catch (
+            error
+        )
+        {
+            alert(
+                error instanceof Error
+
+                    ? error.message
+
+                    : 'Erro ao realizar transferência.'
+            );
+        }
+        finally
+        {
+            setBusy(
+                false
+            );
+        }
+    }
+
+
+    /*
+     * Cancela uma transferência.
+     */
+    async function cancelarTransferencia(
+        transferencia:
+            Transferencia
+    ) {
+        if (
+            !confirm(
+                `Cancelar a transferência de ${money(transferencia.valor)}?`
+            )
+        )
+        {
+            return;
+        }
+
+
+        const motivo =
+            prompt(
+                'Motivo do cancelamento (opcional):'
+            )
+            ??
+            '';
+
+
+        try {
+            await api.post(
+                `/api/transferencias/${transferencia.id}/cancelar`,
+
+                {
+                    motivo
+                }
+            );
+
+
+            await load();
+        }
+        catch (
+            error
+        )
+        {
+            alert(
+                error instanceof Error
+
+                    ? error.message
+
+                    : 'Erro ao cancelar transferência.'
+            );
+        }
+    }
 
 
     return (
@@ -220,30 +517,61 @@ export default function CashFlowPage() {
 
 
                     <p>
-                        Acompanhe o extrato da conta, entradas, saídas e o saldo projetado em um só lugar.
+                        Acompanhe entradas, saídas, saldos e transferências entre contas.
                     </p>
+
+
+                    {empresaAtiva && (
+
+                        <small>
+                            Empresa ativa:{' '}
+
+                            {
+                                empresaAtiva.nomeFantasia
+                                ||
+                                empresaAtiva.nome
+                            }
+                        </small>
+
+                    )}
 
                 </div>
 
 
-                <button className="btn btn-secondary">
-                    Exportar
-                </button>
+                <div className="action-row">
+
+                    <Button
+                        icon="cash"
+
+                        onClick={() => {
+                            if (
+                                contas.length
+                                <
+                                2
+                            )
+                            {
+                                alert(
+                                    'Cadastre pelo menos duas contas financeiras ativas para realizar transferências.'
+                                );
+
+                                return;
+                            }
+
+
+                            setOpenTransferencia(
+                                true
+                            );
+                        }}
+                    >
+                        Nova Transferência
+                    </Button>
+
+                </div>
 
             </div>
 
 
             <div className="filter-bar">
-
-                <Field label="Período">
-
-                    <input
-                        value="01/09/2026 - 30/09/2026"
-                        readOnly
-                    />
-
-                </Field>
-
 
                 <Field label="Conta Financeira">
 
@@ -254,12 +582,17 @@ export default function CashFlowPage() {
 
                         onChange={
                             event => {
+                                const value =
+                                    event.target.value;
+
+
                                 setAccount(
-                                    event.target.value
+                                    value
                                 );
 
+
                                 void load(
-                                    event.target.value
+                                    value
                                 );
                             }
                         }
@@ -270,23 +603,27 @@ export default function CashFlowPage() {
                         </option>
 
 
-                        {contas.map(
-                            conta => (
+                        {
+                            contas.map(
+                                conta => (
 
-                                <option
-                                    value={
-                                        conta.id
-                                    }
+                                    <option
+                                        value={
+                                            conta.id
+                                        }
 
-                                    key={
-                                        conta.id
-                                    }
-                                >
-                                    {conta.nome}
-                                </option>
+                                        key={
+                                            conta.id
+                                        }
+                                    >
+                                        {
+                                            conta.nome
+                                        }
+                                    </option>
 
+                                )
                             )
-                        )}
+                        }
 
                     </select>
 
@@ -297,30 +634,15 @@ export default function CashFlowPage() {
 
                     <input
                         value={
-                            empresaAtiva
-                                ?.nomeFantasia
+                            empresaAtiva?.nomeFantasia
                             ||
-                            empresaAtiva
-                                ?.nome
+                            empresaAtiva?.nome
                             ||
                             'Nenhuma empresa selecionada'
                         }
 
                         readOnly
                     />
-
-                </Field>
-
-
-                <Field label="Status">
-
-                    <select>
-
-                        <option>
-                            Todos os status
-                        </option>
-
-                    </select>
 
                 </Field>
 
@@ -349,7 +671,6 @@ export default function CashFlowPage() {
                         )
                     }
                     tone="green"
-                    trend="+12,5%"
                 />
 
 
@@ -362,7 +683,6 @@ export default function CashFlowPage() {
                         )
                     }
                     tone="red"
-                    trend="+6,1%"
                 />
 
 
@@ -374,20 +694,18 @@ export default function CashFlowPage() {
                             fluxo.saldoRealizado
                         )
                     }
-                    trend="+37,0%"
                 />
 
 
                 <Kpi
                     icon="cash"
-                    label="Saldo Projetado (30 dias)"
+                    label="Saldo Projetado"
                     value={
                         money(
                             fluxo.saldoProjetado
                         )
                     }
                     tone="purple"
-                    trend="+8,3%"
                 />
 
             </div>
@@ -411,23 +729,19 @@ export default function CashFlowPage() {
                     <div className="mini-axis">
 
                         <span>
-                            01/Set
+                            Início
                         </span>
 
                         <span>
-                            07/Set
+                            Período
                         </span>
 
                         <span>
-                            15/Set
+                            Hoje
                         </span>
 
                         <span>
-                            22/Set
-                        </span>
-
-                        <span>
-                            30/Set
+                            Projeção
                         </span>
 
                     </div>
@@ -435,50 +749,73 @@ export default function CashFlowPage() {
                 </Card>
 
 
-                <Card title="Projeção de Saldo">
+                <Card title="Resumo de Transferências">
 
                     <div className="projection-list">
 
-                        {[
-                            7,
-                            15,
-                            30,
-                            60,
-                            90
-                        ].map(
-                            (
-                                dias,
-                                index
-                            ) => (
+                        <div>
 
-                                <div
-                                    key={
-                                        dias
-                                    }
-                                >
+                            <span>
+                                Transferências registradas
+                            </span>
 
-                                    <span>
-                                        Em {dias} dias
-                                    </span>
+                            <b>
+                                {
+                                    transferencias.length
+                                }
+                            </b>
+
+                        </div>
 
 
-                                    <b>
-                                        {
-                                            money(
-                                                fluxo.saldoProjetado +
-                                                index * 2800
-                                            )
-                                        }
-                                    </b>
+                        <div>
+
+                            <span>
+                                Efetivadas
+                            </span>
+
+                            <b>
+                                {
+                                    transferencias.filter(
+                                        item =>
+                                            item.status
+                                            ===
+                                            'Efetivada'
+                                    )
+                                    .length
+                                }
+                            </b>
+
+                        </div>
 
 
-                                    <small>
-                                        +{10 + index * 9},0%
-                                    </small>
+                        <div>
 
-                                </div>
-                            )
-                        )}
+                            <span>
+                                Canceladas
+                            </span>
+
+                            <b>
+                                {
+                                    transferencias.filter(
+                                        item =>
+                                            item.status
+                                            ===
+                                            'Cancelada'
+                                    )
+                                    .length
+                                }
+                            </b>
+
+                        </div>
+
+                    </div>
+
+
+                    <div className="info-note">
+
+                        Transferências movimentam saldos entre contas da mesma empresa,
+                        mas não são receita nem despesa.
 
                     </div>
 
@@ -487,58 +824,57 @@ export default function CashFlowPage() {
             </div>
 
 
-            <div className="cash-layout lower">
+            <Card
+                title="Extrato de Lançamentos"
 
-                <Card
-                    title="Extrato de Lançamentos"
+                subtitle="Pagamentos, recebimentos e transferências da empresa ativa."
+            >
 
-                    subtitle="Movimentações da conta selecionada no período."
-                >
+                <div className="table-scroll">
 
-                    <div className="table-scroll">
+                    <table>
 
-                        <table>
+                        <thead>
 
-                            <thead>
+                            <tr>
 
-                                <tr>
+                                <th>
+                                    Data
+                                </th>
 
-                                    <th>
-                                        Data
-                                    </th>
+                                <th>
+                                    Histórico
+                                </th>
 
-                                    <th>
-                                        Histórico
-                                    </th>
+                                <th>
+                                    Origem
+                                </th>
 
-                                    <th>
-                                        Origem
-                                    </th>
+                                <th>
+                                    Entrada
+                                </th>
 
-                                    <th>
-                                        Entrada
-                                    </th>
+                                <th>
+                                    Saída
+                                </th>
 
-                                    <th>
-                                        Saída
-                                    </th>
+                                <th>
+                                    Saldo
+                                </th>
 
-                                    <th>
-                                        Saldo
-                                    </th>
+                                <th>
+                                    Status
+                                </th>
 
-                                    <th>
-                                        Status
-                                    </th>
+                            </tr>
 
-                                </tr>
-
-                            </thead>
+                        </thead>
 
 
-                            <tbody>
+                        <tbody>
 
-                                {fluxo.lancamentos.map(
+                            {
+                                fluxo.lancamentos.map(
                                     (
                                         item,
                                         index
@@ -558,30 +894,29 @@ export default function CashFlowPage() {
                                                 }
                                             </td>
 
-
                                             <td>
                                                 {
                                                     item.descricao
                                                 }
                                             </td>
 
-
                                             <td>
 
                                                 <Badge
                                                     tone={
-                                                        item.origem ===
+                                                        item.origem
+                                                        ===
                                                         'Receita'
 
                                                             ? 'success'
 
-                                                            :
-                                                        item.origem ===
-                                                        'Transferência'
+                                                            : item.origem
+                                                            ===
+                                                            'Transferência'
 
-                                                            ? 'info'
+                                                                ? 'info'
 
-                                                            : 'danger'
+                                                                : 'danger'
                                                     }
                                                 >
 
@@ -592,7 +927,6 @@ export default function CashFlowPage() {
                                                 </Badge>
 
                                             </td>
-
 
                                             <td className="num positive-text">
 
@@ -608,7 +942,6 @@ export default function CashFlowPage() {
 
                                             </td>
 
-
                                             <td className="num negative-text">
 
                                                 {
@@ -623,17 +956,13 @@ export default function CashFlowPage() {
 
                                             </td>
 
-
                                             <td className="num">
-
                                                 {
                                                     money(
                                                         item.saldo
                                                     )
                                                 }
-
                                             </td>
-
 
                                             <td>
 
@@ -644,33 +973,204 @@ export default function CashFlowPage() {
                                                         )
                                                     }
                                                 >
-
                                                     {
                                                         item.status
                                                     }
-
                                                 </Badge>
 
                                             </td>
 
                                         </tr>
+
                                     )
-                                )}
+                                )
+                            }
 
-                            </tbody>
+                        </tbody>
 
-                        </table>
-
-                    </div>
-
-                </Card>
+                    </table>
 
 
-                <Card title="Alertas Financeiros">
+                    {
+                        !fluxo.lancamentos.length
+                        &&
+                        <EmptyState />
+                    }
 
-                    <div className="alert-list">
+                </div>
 
-                        {mockAlerts.map(
+            </Card>
+
+
+            <Card title="Transferências entre Contas">
+
+                <div className="table-scroll">
+
+                    <table>
+
+                        <thead>
+
+                            <tr>
+
+                                <th>
+                                    Data
+                                </th>
+
+                                <th>
+                                    Origem
+                                </th>
+
+                                <th>
+                                    Destino
+                                </th>
+
+                                <th>
+                                    Descrição
+                                </th>
+
+                                <th>
+                                    Valor
+                                </th>
+
+                                <th>
+                                    Status
+                                </th>
+
+                                <th>
+                                    Ações
+                                </th>
+
+                            </tr>
+
+                        </thead>
+
+
+                        <tbody>
+
+                            {
+                                transferencias.map(
+                                    item => (
+
+                                        <tr
+                                            key={
+                                                item.id
+                                            }
+                                        >
+
+                                            <td>
+                                                {
+                                                    dateBR(
+                                                        item.data
+                                                    )
+                                                }
+                                            </td>
+
+                                            <td>
+                                                {
+                                                    nomeConta(
+                                                        item.contaOrigemId
+                                                    )
+                                                }
+                                            </td>
+
+                                            <td>
+                                                {
+                                                    nomeConta(
+                                                        item.contaDestinoId
+                                                    )
+                                                }
+                                            </td>
+
+                                            <td>
+                                                {
+                                                    item.descricao
+                                                    ||
+                                                    'Transferência entre contas'
+                                                }
+                                            </td>
+
+                                            <td>
+                                                {
+                                                    money(
+                                                        item.valor
+                                                    )
+                                                }
+                                            </td>
+
+                                            <td>
+
+                                                <Badge
+                                                    tone={
+                                                        statusTone(
+                                                            item.status
+                                                        )
+                                                    }
+                                                >
+                                                    {
+                                                        item.status
+                                                    }
+                                                </Badge>
+
+                                            </td>
+
+                                            <td>
+
+                                                {
+                                                    item.status
+                                                    !==
+                                                    'Cancelada'
+
+                                                    ? (
+
+                                                        <Button
+                                                            variant="danger"
+
+                                                            onClick={() =>
+                                                                void cancelarTransferencia(
+                                                                    item
+                                                                )
+                                                            }
+                                                        >
+                                                            Cancelar
+                                                        </Button>
+
+                                                    )
+
+                                                    : '—'
+                                                }
+
+                                            </td>
+
+                                        </tr>
+
+                                    )
+                                )
+                            }
+
+                        </tbody>
+
+                    </table>
+
+
+                    {
+                        !transferencias.length
+                        &&
+                        <EmptyState
+                            text="Nenhuma transferência registrada."
+                        />
+                    }
+
+                </div>
+
+            </Card>
+
+
+            <Card title="Alertas Financeiros">
+
+                <div className="alert-list">
+
+                    {
+                        mockAlerts.map(
                             (
                                 alerta,
                                 index
@@ -699,19 +1199,201 @@ export default function CashFlowPage() {
                                     </span>
 
                                 </div>
+
                             )
-                        )}
+                        )
+                    }
+
+                </div>
+
+            </Card>
+
+
+            {/*
+             * MODAL TRANSFERÊNCIA
+             */}
+
+            <Modal
+                open={
+                    openTransferencia
+                }
+
+                title="Nova Transferência entre Contas"
+
+                onClose={() =>
+                    setOpenTransferencia(
+                        false
+                    )
+                }
+            >
+
+                <form
+                    className="form-grid"
+
+                    onSubmit={
+                        criarTransferencia
+                    }
+                >
+
+                    <Field label="Conta de Origem">
+
+                        <select
+                            name="contaOrigemId"
+
+                            required
+
+                            defaultValue=""
+                        >
+
+                            <option value="">
+                                Selecione
+                            </option>
+
+
+                            {
+                                contas.map(
+                                    conta => (
+
+                                        <option
+                                            key={
+                                                conta.id
+                                            }
+
+                                            value={
+                                                conta.id
+                                            }
+                                        >
+                                            {
+                                                conta.nome
+                                            }
+                                        </option>
+
+                                    )
+                                )
+                            }
+
+                        </select>
+
+                    </Field>
+
+
+                    <Field label="Conta de Destino">
+
+                        <select
+                            name="contaDestinoId"
+
+                            required
+
+                            defaultValue=""
+                        >
+
+                            <option value="">
+                                Selecione
+                            </option>
+
+
+                            {
+                                contas.map(
+                                    conta => (
+
+                                        <option
+                                            key={
+                                                conta.id
+                                            }
+
+                                            value={
+                                                conta.id
+                                            }
+                                        >
+                                            {
+                                                conta.nome
+                                            }
+                                        </option>
+
+                                    )
+                                )
+                            }
+
+                        </select>
+
+                    </Field>
+
+
+                    <Field label="Valor">
+
+                        <input
+                            name="valor"
+
+                            type="number"
+
+                            min="0.01"
+
+                            step="0.01"
+
+                            required
+                        />
+
+                    </Field>
+
+
+                    <Field label="Data">
+
+                        <input
+                            name="data"
+
+                            type="date"
+
+                            required
+
+                            defaultValue={
+                                hoje()
+                            }
+                        />
+
+                    </Field>
+
+
+                    <Field label="Descrição">
+
+                        <input
+                            name="descricao"
+
+                            placeholder="Ex.: Reforço de caixa"
+                        />
+
+                    </Field>
+
+
+                    <div className="form-actions">
+
+                        <Button
+                            variant="secondary"
+
+                            onClick={() =>
+                                setOpenTransferencia(
+                                    false
+                                )
+                            }
+                        >
+                            Cancelar
+                        </Button>
+
+
+                        <Button
+                            type="submit"
+
+                            disabled={
+                                busy
+                            }
+                        >
+                            Transferir
+                        </Button>
 
                     </div>
 
+                </form>
 
-                    <div className="info-note">
-                        Transferências entre contas da mesma empresa não afetam o resultado consolidado, mas aparecem no extrato da conta selecionada.
-                    </div>
-
-                </Card>
-
-            </div>
+            </Modal>
 
         </>
     );

@@ -39,16 +39,11 @@ import {
     EmptyState,
     Field,
     Kpi,
-    Modal
+    Modal,
+    money
 } from '../components/UI';
 
 
-/*
- * Abas disponíveis.
- *
- * Categorias foi unificada
- * com Plano de Contas.
- */
 type Tab =
     | 'Empresas'
     | 'Clientes'
@@ -57,12 +52,127 @@ type Tab =
     | 'Contas Financeiras';
 
 
+type StatusFilter =
+    | 'Todos'
+    | 'Ativos'
+    | 'Inativos';
+
+
 /*
- * Página principal dos cadastros.
+ * Compara dois códigos do Plano de Contas.
+ *
+ * Exemplos:
+ *
+ * 1
+ * 1.01
+ * 1.02
+ * 1.10
+ * 2
+ * 2.01
+ * 10
+ *
+ * A comparação é feita numericamente por nível,
+ * evitando a utilização de localeCompare com
+ * argumentos não suportados pela configuração
+ * atual do TypeScript do projeto.
+ */
+function compararCodigosPlano(
+    codigoA?: string | null,
+    codigoB?: string | null
+): number {
+    /*
+     * Divide cada código pelos pontos.
+     *
+     * Exemplo:
+     *
+     * 2.01.03
+     *
+     * vira:
+     *
+     * [2, 1, 3]
+     */
+    const partesA =
+        String(
+            codigoA ?? ''
+        )
+            .split('.')
+            .map(
+                parte =>
+                    Number(
+                        parte
+                    )
+            );
+
+
+    const partesB =
+        String(
+            codigoB ?? ''
+        )
+            .split('.')
+            .map(
+                parte =>
+                    Number(
+                        parte
+                    )
+            );
+
+
+    /*
+     * Descobre qual código possui
+     * mais níveis.
+     */
+    const maiorQuantidade =
+        Math.max(
+            partesA.length,
+            partesB.length
+        );
+
+
+    /*
+     * Compara cada nível individualmente.
+     */
+    for (
+        let indice = 0;
+        indice < maiorQuantidade;
+        indice++
+    ) {
+        const valorA =
+            Number.isNaN(
+                partesA[indice]
+            )
+                ? 0
+                : partesA[indice] ?? 0;
+
+
+        const valorB =
+            Number.isNaN(
+                partesB[indice]
+            )
+                ? 0
+                : partesB[indice] ?? 0;
+
+
+        if (valorA < valorB) {
+            return -1;
+        }
+
+
+        if (valorA > valorB) {
+            return 1;
+        }
+    }
+
+
+    return 0;
+}
+
+
+/*
+ * Página principal de Cadastros.
  */
 export default function RegistryPage() {
     /*
-     * Empresa global.
+     * Dados da Empresa Ativa Global.
      */
     const {
         empresas,
@@ -74,7 +184,7 @@ export default function RegistryPage() {
 
 
     /*
-     * Aba atual.
+     * Aba selecionada.
      */
     const [
         tab,
@@ -86,7 +196,7 @@ export default function RegistryPage() {
 
 
     /*
-     * Dados da empresa ativa.
+     * Clientes da empresa ativa.
      */
     const [
         clientes,
@@ -97,6 +207,9 @@ export default function RegistryPage() {
         );
 
 
+    /*
+     * Fornecedores da empresa ativa.
+     */
     const [
         fornecedores,
         setFornecedores
@@ -106,6 +219,9 @@ export default function RegistryPage() {
         );
 
 
+    /*
+     * Plano de Contas.
+     */
     const [
         categorias,
         setCategorias
@@ -115,6 +231,9 @@ export default function RegistryPage() {
         );
 
 
+    /*
+     * Contas Financeiras.
+     */
     const [
         contas,
         setContas
@@ -127,7 +246,7 @@ export default function RegistryPage() {
 
 
     /*
-     * Modo demonstrativo.
+     * Indica utilização dos dados demonstrativos.
      */
     const [
         demo,
@@ -139,7 +258,31 @@ export default function RegistryPage() {
 
 
     /*
-     * Modais.
+     * Campo de busca para Cliente/Fornecedor.
+     */
+    const [
+        busca,
+        setBusca
+    ] =
+        useState(
+            ''
+        );
+
+
+    /*
+     * Filtro de status.
+     */
+    const [
+        statusFilter,
+        setStatusFilter
+    ] =
+        useState<StatusFilter>(
+            'Todos'
+        );
+
+
+    /*
+     * Modal de Cliente/Fornecedor.
      */
     const [
         openPessoa,
@@ -150,6 +293,9 @@ export default function RegistryPage() {
         );
 
 
+    /*
+     * Modal dos demais cadastros.
+     */
     const [
         openCadastro,
         setOpenCadastro
@@ -160,11 +306,11 @@ export default function RegistryPage() {
 
 
     /*
-     * Registro selecionado.
+     * Cliente/Fornecedor sendo editado.
      */
     const [
-        selected,
-        setSelected
+        pessoaEditando,
+        setPessoaEditando
     ] =
         useState<
             Pessoa | null
@@ -188,8 +334,7 @@ export default function RegistryPage() {
 
 
     /*
-     * Conta do Plano de Contas
-     * sendo editada.
+     * Conta do Plano de Contas sendo editada.
      */
     const [
         categoriaEditando,
@@ -203,8 +348,7 @@ export default function RegistryPage() {
 
 
     /*
-     * Conta financeira
-     * sendo editada.
+     * Conta Financeira sendo editada.
      */
     const [
         contaEditando,
@@ -218,9 +362,38 @@ export default function RegistryPage() {
 
 
     /*
-     * Carrega os dados vinculados
-     * à Empresa Ativa.
+     * Cliente ou Fornecedor selecionado.
      */
+    const [
+        selected,
+        setSelected
+    ] =
+        useState<
+            Pessoa | null
+        >(
+            null
+        );
+
+
+    /*
+     * Evita múltiplos envios durante
+     * operações de salvamento.
+     */
+    const [
+        busy,
+        setBusy
+    ] =
+        useState(
+            false
+        );
+
+
+    /*
+     * ============================================================
+     * CARREGAMENTO DOS CADASTROS
+     * ============================================================
+     */
+
     async function load() {
         const [
             clientesResult,
@@ -229,6 +402,9 @@ export default function RegistryPage() {
             contasResult
         ] =
             await Promise.all([
+                /*
+                 * Clientes.
+                 */
                 loadWithFallback(
                     () =>
                         api.get<
@@ -239,12 +415,17 @@ export default function RegistryPage() {
 
                     mockClientes.filter(
                         item =>
-                            !empresaAtivaId ||
-                            item.empresaId ===
-                                empresaAtivaId
+                            !empresaAtivaId
+                            ||
+                            item.empresaId
+                            ===
+                            empresaAtivaId
                     )
                 ),
 
+                /*
+                 * Fornecedores.
+                 */
                 loadWithFallback(
                     () =>
                         api.get<
@@ -255,12 +436,17 @@ export default function RegistryPage() {
 
                     mockFornecedores.filter(
                         item =>
-                            !empresaAtivaId ||
-                            item.empresaId ===
-                                empresaAtivaId
+                            !empresaAtivaId
+                            ||
+                            item.empresaId
+                            ===
+                            empresaAtivaId
                     )
                 ),
 
+                /*
+                 * Plano de Contas.
+                 */
                 loadWithFallback(
                     () =>
                         api.get<
@@ -271,12 +457,17 @@ export default function RegistryPage() {
 
                     mockCategorias.filter(
                         item =>
-                            !empresaAtivaId ||
-                            item.empresaId ===
-                                empresaAtivaId
+                            !empresaAtivaId
+                            ||
+                            item.empresaId
+                            ===
+                            empresaAtivaId
                     )
                 ),
 
+                /*
+                 * Contas Financeiras.
+                 */
                 loadWithFallback(
                     () =>
                         api.get<
@@ -287,14 +478,19 @@ export default function RegistryPage() {
 
                     mockContasFinanceiras.filter(
                         item =>
-                            !empresaAtivaId ||
-                            item.empresaId ===
-                                empresaAtivaId
+                            !empresaAtivaId
+                            ||
+                            item.empresaId
+                            ===
+                            empresaAtivaId
                     )
                 )
             ]);
 
 
+        /*
+         * Atualiza os estados.
+         */
         setClientes(
             clientesResult.data
         );
@@ -315,51 +511,44 @@ export default function RegistryPage() {
         );
 
 
+        /*
+         * Ativa indicador demonstrativo
+         * se alguma consulta usou fallback.
+         */
         setDemo(
-            clientesResult.demo ||
-            fornecedoresResult.demo ||
-            categoriasResult.demo ||
+            clientesResult.demo
+            ||
+            fornecedoresResult.demo
+            ||
+            categoriasResult.demo
+            ||
             contasResult.demo
         );
 
 
         /*
-         * Mantém a seleção quando possível.
+         * Atualiza a seleção mantendo o registro
+         * atual quando ele ainda existir.
          */
         setSelected(
-            current => {
-                if (
+            atual => {
+                const source =
                     tab ===
                     'Fornecedores'
-                ) {
-                    return (
-                        fornecedoresResult
-                            .data
-                            .find(
-                                item =>
-                                    item.id ===
-                                    current?.id
-                            )
-                        ??
-                        fornecedoresResult
-                            .data[0]
-                        ??
-                        null
-                    );
-                }
+
+                        ? fornecedoresResult.data
+
+                        : clientesResult.data;
 
 
                 return (
-                    clientesResult
-                        .data
-                        .find(
-                            item =>
-                                item.id ===
-                                current?.id
-                        )
+                    source.find(
+                        item =>
+                            item.id ===
+                            atual?.id
+                    )
                     ??
-                    clientesResult
-                        .data[0]
+                    source[0]
                     ??
                     null
                 );
@@ -369,18 +558,19 @@ export default function RegistryPage() {
 
 
     /*
-     * Executa quando a página abre.
-     *
-     * A página também é remontada pelo App
-     * sempre que a empresa ativa muda.
+     * Carrega os dados ao abrir a página.
      */
-    useEffect(() => {
-        void load();
-    }, []);
+    useEffect(
+        () => {
+            void load();
+        },
+
+        []
+    );
 
 
     /*
-     * Lista usada em Cliente/Fornecedor.
+     * Define qual lista será utilizada.
      */
     const people =
         tab ===
@@ -392,11 +582,188 @@ export default function RegistryPage() {
 
 
     /*
-     * --------------------------------------------------
-     * CLIENTE / FORNECEDOR
-     * --------------------------------------------------
+     * ============================================================
+     * PESQUISA E FILTRO
+     * ============================================================
      */
-    async function createPerson(
+
+    const peopleFiltradas =
+        useMemo(
+            () => {
+                const termo =
+                    busca
+                        .trim()
+                        .toLowerCase();
+
+
+                return people.filter(
+                    pessoa => {
+                        /*
+                         * Busca pelos principais campos.
+                         */
+                        const bateBusca =
+                            !termo
+                            ||
+                            pessoa.nome
+                                .toLowerCase()
+                                .includes(
+                                    termo
+                                )
+                            ||
+                            (
+                                pessoa.cpfCnpj
+                                ??
+                                ''
+                            )
+                                .toLowerCase()
+                                .includes(
+                                    termo
+                                )
+                            ||
+                            (
+                                pessoa.email
+                                ??
+                                ''
+                            )
+                                .toLowerCase()
+                                .includes(
+                                    termo
+                                )
+                            ||
+                            (
+                                pessoa.telefone
+                                ??
+                                ''
+                            )
+                                .toLowerCase()
+                                .includes(
+                                    termo
+                                )
+                            ||
+                            (
+                                pessoa.endereco
+                                ??
+                                ''
+                            )
+                                .toLowerCase()
+                                .includes(
+                                    termo
+                                );
+
+
+                        /*
+                         * Filtra pelo status.
+                         */
+                        const bateStatus =
+                            statusFilter
+                            ===
+                            'Todos'
+
+                            ||
+
+                            (
+                                statusFilter
+                                ===
+                                'Ativos'
+                                &&
+                                pessoa.ativo
+                            )
+
+                            ||
+
+                            (
+                                statusFilter
+                                ===
+                                'Inativos'
+                                &&
+                                !pessoa.ativo
+                            );
+
+
+                        return (
+                            bateBusca
+                            &&
+                            bateStatus
+                        );
+                    }
+                );
+            },
+
+            [
+                people,
+                busca,
+                statusFilter
+            ]
+        );
+
+
+    /*
+     * ============================================================
+     * ORDENAÇÃO DO PLANO DE CONTAS
+     * ============================================================
+     *
+     * CORREÇÃO:
+     *
+     * A versão anterior utilizava localeCompare
+     * passando três argumentos.
+     *
+     * A configuração atual do TypeScript reconhecia
+     * somente uma assinatura com um argumento.
+     *
+     * Agora usamos compararCodigosPlano().
+     */
+    const planoContasOrdenado =
+        useMemo(
+            () =>
+                [...categorias]
+                    .sort(
+                        (
+                            a,
+                            b
+                        ) =>
+                            compararCodigosPlano(
+                                a.codigo,
+                                b.codigo
+                            )
+                    ),
+
+            [
+                categorias
+            ]
+        );
+
+
+    /*
+     * Confirma que existe Empresa Ativa.
+     */
+    function exigirEmpresa() {
+        if (
+            empresaAtivaId
+        )
+        {
+            return true;
+        }
+
+
+        alert(
+            'Cadastre ou selecione uma empresa antes de continuar.'
+        );
+
+
+        return false;
+    }
+
+
+    /*
+     * ============================================================
+     * CLIENTE / FORNECEDOR
+     * ============================================================
+     */
+
+    /*
+     * Cria ou atualiza Cliente/Fornecedor.
+     */
+    async function salvarPessoa(
         event:
             FormEvent<
                 HTMLFormElement
@@ -405,13 +772,17 @@ export default function RegistryPage() {
         event.preventDefault();
 
 
-        if (!empresaAtivaId) {
-            alert(
-                'Cadastre ou selecione uma empresa antes de criar este registro.'
-            );
-
+        if (
+            !exigirEmpresa()
+        )
+        {
             return;
         }
+
+
+        setBusy(
+            true
+        );
 
 
         const form =
@@ -421,10 +792,6 @@ export default function RegistryPage() {
 
 
         const body = {
-            /*
-             * Agora usa explicitamente
-             * a empresa selecionada.
-             */
             empresaId:
                 empresaAtivaId,
 
@@ -432,63 +799,96 @@ export default function RegistryPage() {
                 String(
                     form.get(
                         'nome'
-                    ) || ''
+                    )
+                    ||
+                    ''
                 ),
 
             cpfCnpj:
                 String(
                     form.get(
                         'cpfCnpj'
-                    ) || ''
+                    )
+                    ||
+                    ''
                 ),
 
             email:
                 String(
                     form.get(
                         'email'
-                    ) || ''
+                    )
+                    ||
+                    ''
                 ),
 
             telefone:
                 String(
                     form.get(
                         'telefone'
-                    ) || ''
+                    )
+                    ||
+                    ''
                 ),
 
             endereco:
                 String(
                     form.get(
                         'endereco'
-                    ) || ''
+                    )
+                    ||
+                    ''
                 ),
 
             observacoes:
                 String(
                     form.get(
                         'observacoes'
-                    ) || ''
+                    )
+                    ||
+                    ''
                 ),
 
             ativo:
+                pessoaEditando
+                    ?.ativo
+                ??
                 true
         };
 
 
+        const endpoint =
+            tab ===
+            'Fornecedores'
+
+                ? '/api/fornecedores'
+
+                : '/api/clientes';
+
+
         try {
-            const endpoint =
-                tab ===
-                'Fornecedores'
-
-                    ? '/api/fornecedores'
-
-                    : '/api/clientes';
-
-
-            await api.post(
-                endpoint,
-                body
-            );
+            /*
+             * Atualização.
+             */
+            if (
+                pessoaEditando
+            )
+            {
+                await api.put(
+                    `${endpoint}/${pessoaEditando.id}`,
+                    body
+                );
+            }
+            else
+            {
+                /*
+                 * Novo cadastro.
+                 */
+                await api.post(
+                    endpoint,
+                    body
+                );
+            }
 
 
             setOpenPessoa(
@@ -496,9 +896,17 @@ export default function RegistryPage() {
             );
 
 
-            await load();
+            setPessoaEditando(
+                null
+            );
 
-        } catch (error) {
+
+            await load();
+        }
+        catch (
+            error
+        )
+        {
             alert(
                 error instanceof Error
 
@@ -507,13 +915,162 @@ export default function RegistryPage() {
                     : 'Erro ao salvar cadastro.'
             );
         }
+        finally
+        {
+            setBusy(
+                false
+            );
+        }
     }
 
 
     /*
-     * --------------------------------------------------
+     * Inativa ou reativa Cliente/Fornecedor.
+     */
+    async function alternarPessoa(
+        pessoa:
+            Pessoa
+    ) {
+        if (
+            !exigirEmpresa()
+        )
+        {
+            return;
+        }
+
+
+        const endpoint =
+            tab ===
+            'Fornecedores'
+
+                ? '/api/fornecedores'
+
+                : '/api/clientes';
+
+
+        try {
+            await api.put(
+                `${endpoint}/${pessoa.id}`,
+
+                {
+                    empresaId:
+                        empresaAtivaId,
+
+                    nome:
+                        pessoa.nome,
+
+                    cpfCnpj:
+                        pessoa.cpfCnpj,
+
+                    email:
+                        pessoa.email,
+
+                    telefone:
+                        pessoa.telefone,
+
+                    endereco:
+                        pessoa.endereco,
+
+                    observacoes:
+                        pessoa.observacoes,
+
+                    ativo:
+                        !pessoa.ativo
+                }
+            );
+
+
+            await load();
+        }
+        catch (
+            error
+        )
+        {
+            alert(
+                error instanceof Error
+
+                    ? error.message
+
+                    : 'Erro ao alterar status.'
+            );
+        }
+    }
+
+
+    /*
+     * Exclui Cliente ou Fornecedor.
+     *
+     * O backend impede a exclusão
+     * quando existirem lançamentos vinculados.
+     */
+    async function excluirPessoa(
+        pessoa:
+            Pessoa
+    ) {
+        const entidade =
+            tab ===
+            'Fornecedores'
+
+                ? 'fornecedor'
+
+                : 'cliente';
+
+
+        if (
+            !confirm(
+                `Excluir definitivamente o ${entidade} "${pessoa.nome}"?`
+            )
+        )
+        {
+            return;
+        }
+
+
+        const endpoint =
+            tab ===
+            'Fornecedores'
+
+                ? '/api/fornecedores'
+
+                : '/api/clientes';
+
+
+        try {
+            await api.delete(
+                `${endpoint}/${pessoa.id}`
+            );
+
+
+            setSelected(
+                null
+            );
+
+
+            await load();
+        }
+        catch (
+            error
+        )
+        {
+            alert(
+                error instanceof Error
+
+                    ? error.message
+
+                    : 'Não foi possível excluir o cadastro.'
+            );
+        }
+    }
+
+
+    /*
+     * ============================================================
      * EMPRESA
-     * --------------------------------------------------
+     * ============================================================
+     */
+
+    /*
+     * Cria ou atualiza empresa.
      */
     async function salvarEmpresa(
         event:
@@ -524,6 +1081,11 @@ export default function RegistryPage() {
         event.preventDefault();
 
 
+        setBusy(
+            true
+        );
+
+
         const form =
             new FormData(
                 event.currentTarget
@@ -535,42 +1097,54 @@ export default function RegistryPage() {
                 String(
                     form.get(
                         'nome'
-                    ) || ''
+                    )
+                    ||
+                    ''
                 ),
 
             nomeFantasia:
                 String(
                     form.get(
                         'nomeFantasia'
-                    ) || ''
+                    )
+                    ||
+                    ''
                 ),
 
             cpfCnpj:
                 String(
                     form.get(
                         'cpfCnpj'
-                    ) || ''
+                    )
+                    ||
+                    ''
                 ),
 
             email:
                 String(
                     form.get(
                         'email'
-                    ) || ''
+                    )
+                    ||
+                    ''
                 ),
 
             telefone:
                 String(
                     form.get(
                         'telefone'
-                    ) || ''
+                    )
+                    ||
+                    ''
                 ),
 
             endereco:
                 String(
                     form.get(
                         'endereco'
-                    ) || ''
+                    )
+                    ||
+                    ''
                 ),
 
             ativa:
@@ -582,28 +1156,22 @@ export default function RegistryPage() {
 
 
         try {
-            let empresaSalva:
-                Empresa;
+            const salva =
+                empresaEditando
 
-
-            if (empresaEditando) {
-                empresaSalva =
-                    await api.put<
+                    ? await api.put<
                         Empresa
                     >(
                         `/api/empresas/${empresaEditando.id}`,
                         body
-                    );
+                    )
 
-            } else {
-                empresaSalva =
-                    await api.post<
+                    : await api.post<
                         Empresa
                     >(
                         '/api/empresas',
                         body
                     );
-            }
 
 
             setOpenCadastro(
@@ -617,18 +1185,20 @@ export default function RegistryPage() {
 
 
             /*
-             * Atualiza a lista global
-             * e seleciona automaticamente
-             * a empresa criada/editada.
+             * Atualiza o contexto global
+             * e mantém a empresa salva ativa.
              */
             await atualizarEmpresas(
-                empresaSalva.id
+                salva.id
             );
 
 
             await load();
-
-        } catch (error) {
+        }
+        catch (
+            error
+        )
+        {
             alert(
                 error instanceof Error
 
@@ -637,13 +1207,24 @@ export default function RegistryPage() {
                     : 'Erro ao salvar empresa.'
             );
         }
+        finally
+        {
+            setBusy(
+                false
+            );
+        }
     }
 
 
     /*
-     * --------------------------------------------------
+     * ============================================================
      * PLANO DE CONTAS
-     * --------------------------------------------------
+     * ============================================================
+     */
+
+    /*
+     * Cria ou atualiza conta
+     * do Plano de Contas.
      */
     async function salvarContaPlano(
         event:
@@ -654,13 +1235,17 @@ export default function RegistryPage() {
         event.preventDefault();
 
 
-        if (!empresaAtivaId) {
-            alert(
-                'Selecione uma empresa antes de cadastrar o Plano de Contas.'
-            );
-
+        if (
+            !exigirEmpresa()
+        )
+        {
             return;
         }
+
+
+        setBusy(
+            true
+        );
 
 
         const form =
@@ -683,14 +1268,17 @@ export default function RegistryPage() {
                 String(
                     form.get(
                         'nome'
-                    ) || ''
+                    )
+                    ||
+                    ''
                 ),
 
             tipo:
                 String(
                     form.get(
                         'tipo'
-                    ) ||
+                    )
+                    ||
                     'Despesa'
                 ),
 
@@ -707,7 +1295,9 @@ export default function RegistryPage() {
                 String(
                     form.get(
                         'codigo'
-                    ) || ''
+                    )
+                    ||
+                    ''
                 ),
 
             ativa:
@@ -719,13 +1309,17 @@ export default function RegistryPage() {
 
 
         try {
-            if (categoriaEditando) {
+            if (
+                categoriaEditando
+            )
+            {
                 await api.put(
                     `/api/plano-contas/${categoriaEditando.id}`,
                     body
                 );
-
-            } else {
+            }
+            else
+            {
                 await api.post(
                     '/api/plano-contas',
                     body
@@ -744,8 +1338,11 @@ export default function RegistryPage() {
 
 
             await load();
-
-        } catch (error) {
+        }
+        catch (
+            error
+        )
+        {
             alert(
                 error instanceof Error
 
@@ -754,13 +1351,117 @@ export default function RegistryPage() {
                     : 'Erro ao salvar conta do Plano de Contas.'
             );
         }
+        finally
+        {
+            setBusy(
+                false
+            );
+        }
     }
 
 
     /*
-     * --------------------------------------------------
+     * Inativa ou reativa conta
+     * do Plano de Contas.
+     */
+    async function alternarContaPlano(
+        conta:
+            Categoria
+    ) {
+        try {
+            await api.put(
+                `/api/plano-contas/${conta.id}`,
+
+                {
+                    empresaId:
+                        empresaAtivaId,
+
+                    nome:
+                        conta.nome,
+
+                    tipo:
+                        conta.tipo,
+
+                    categoriaPaiId:
+                        conta.categoriaPaiId,
+
+                    codigo:
+                        conta.codigo,
+
+                    ativa:
+                        !conta.ativa
+                }
+            );
+
+
+            await load();
+        }
+        catch (
+            error
+        )
+        {
+            alert(
+                error instanceof Error
+
+                    ? error.message
+
+                    : 'Erro ao alterar status.'
+            );
+        }
+    }
+
+
+    /*
+     * Exclui conta do Plano de Contas.
+     *
+     * O backend deve impedir a exclusão
+     * caso existam filhos ou lançamentos.
+     */
+    async function excluirContaPlano(
+        conta:
+            Categoria
+    ) {
+        if (
+            !confirm(
+                `Excluir definitivamente a conta "${conta.nome}" do Plano de Contas?`
+            )
+        )
+        {
+            return;
+        }
+
+
+        try {
+            await api.delete(
+                `/api/plano-contas/${conta.id}`
+            );
+
+
+            await load();
+        }
+        catch (
+            error
+        )
+        {
+            alert(
+                error instanceof Error
+
+                    ? error.message
+
+                    : 'Não foi possível excluir a conta.'
+            );
+        }
+    }
+
+
+    /*
+     * ============================================================
      * CONTAS FINANCEIRAS
-     * --------------------------------------------------
+     * ============================================================
+     */
+
+    /*
+     * Cria ou atualiza Conta Financeira.
      */
     async function salvarContaFinanceira(
         event:
@@ -771,13 +1472,17 @@ export default function RegistryPage() {
         event.preventDefault();
 
 
-        if (!empresaAtivaId) {
-            alert(
-                'Selecione uma empresa antes de cadastrar uma conta financeira.'
-            );
-
+        if (
+            !exigirEmpresa()
+        )
+        {
             return;
         }
+
+
+        setBusy(
+            true
+        );
 
 
         const form =
@@ -794,42 +1499,65 @@ export default function RegistryPage() {
                 String(
                     form.get(
                         'nome'
-                    ) || ''
+                    )
+                    ||
+                    ''
                 ),
 
             tipo:
                 String(
                     form.get(
                         'tipo'
-                    ) || ''
+                    )
+                    ||
+                    ''
                 ),
 
             instituicao:
                 String(
                     form.get(
                         'instituicao'
-                    ) || ''
+                    )
+                    ||
+                    ''
                 ),
 
             agencia:
                 String(
                     form.get(
                         'agencia'
-                    ) || ''
+                    )
+                    ||
+                    ''
                 ),
 
             numeroConta:
                 String(
                     form.get(
                         'numeroConta'
-                    ) || ''
+                    )
+                    ||
+                    ''
                 ),
 
+            /*
+             * O saldo inicial somente pode
+             * ser definido no cadastro.
+             *
+             * Durante a edição o valor
+             * original é preservado.
+             */
             saldoInicial:
+                contaEditando
+                    ?.saldoInicial
+
+                ??
                 Number(
                     form.get(
                         'saldoInicial'
-                    ) || 0
+                    )
+                    ||
+                    0
                 ),
 
             ativa:
@@ -841,13 +1569,17 @@ export default function RegistryPage() {
 
 
         try {
-            if (contaEditando) {
+            if (
+                contaEditando
+            )
+            {
                 await api.put(
                     `/api/contas-financeiras/${contaEditando.id}`,
                     body
                 );
-
-            } else {
+            }
+            else
+            {
                 await api.post(
                     '/api/contas-financeiras',
                     body
@@ -866,8 +1598,11 @@ export default function RegistryPage() {
 
 
             await load();
-
-        } catch (error) {
+        }
+        catch (
+            error
+        )
+        {
             alert(
                 error instanceof Error
 
@@ -876,58 +1611,156 @@ export default function RegistryPage() {
                     : 'Erro ao salvar conta financeira.'
             );
         }
+        finally
+        {
+            setBusy(
+                false
+            );
+        }
     }
 
 
     /*
-     * Abre cadastro vazio.
+     * Inativa ou reativa Conta Financeira.
      */
-    function abrirNovoCadastro() {
-        setEmpresaEditando(
-            null
-        );
+    async function alternarContaFinanceira(
+        conta:
+            ContaFinanceira
+    ) {
+        try {
+            await api.put(
+                `/api/contas-financeiras/${conta.id}`,
 
-        setCategoriaEditando(
-            null
-        );
+                {
+                    empresaId:
+                        conta.empresaId
+                        ??
+                        empresaAtivaId,
 
-        setContaEditando(
-            null
-        );
+                    nome:
+                        conta.nome,
 
-        setOpenCadastro(
-            true
-        );
+                    tipo:
+                        conta.tipo,
+
+                    instituicao:
+                        conta.instituicao,
+
+                    agencia:
+                        conta.agencia,
+
+                    numeroConta:
+                        conta.numeroConta,
+
+                    saldoInicial:
+                        conta.saldoInicial,
+
+                    ativa:
+                        !conta.ativa
+                }
+            );
+
+
+            await load();
+        }
+        catch (
+            error
+        )
+        {
+            alert(
+                error instanceof Error
+
+                    ? error.message
+
+                    : 'Erro ao alterar status da conta.'
+            );
+        }
     }
 
 
     /*
-     * Calcula o nível hierárquico
-     * do Plano de Contas.
+     * Exclui Conta Financeira.
+     *
+     * O backend deverá bloquear se existirem
+     * movimentações financeiras vinculadas.
      */
-    function obterNivelConta(
-        conta: Categoria,
-
-        visitados:
-            Set<number> =
-                new Set()
-    ): number {
+    async function excluirContaFinanceira(
+        conta:
+            ContaFinanceira
+    ) {
         if (
-            !conta.categoriaPaiId
-        ) {
-            return 0;
+            !confirm(
+                `Excluir definitivamente a conta financeira "${conta.nome}"?`
+            )
+        )
+        {
+            return;
         }
 
 
+        try {
+            await api.delete(
+                `/api/contas-financeiras/${conta.id}`
+            );
+
+
+            await load();
+        }
+        catch (
+            error
+        )
+        {
+            alert(
+                error instanceof Error
+
+                    ? error.message
+
+                    : 'Não foi possível excluir a conta financeira.'
+            );
+        }
+    }
+
+
+    /*
+     * ============================================================
+     * HIERARQUIA DO PLANO DE CONTAS
+     * ============================================================
+     */
+
+    /*
+     * Calcula a profundidade da conta.
+     *
+     * Exemplo:
+     *
+     * 2             nível 0
+     * 2.01          nível 1
+     * 2.01.01       nível 2
+     */
+    function obterNivelConta(
+        conta:
+            Categoria,
+
+        visitados =
+            new Set<number>()
+    ): number {
+        /*
+         * Conta raiz.
+         */
         if (
+            !conta.categoriaPaiId
+            ||
             visitados.has(
                 conta.id
             )
-        ) {
+        )
+        {
             return 0;
         }
 
 
+        /*
+         * Evita ciclos infinitos.
+         */
         visitados.add(
             conta.id
         );
@@ -941,61 +1774,95 @@ export default function RegistryPage() {
             );
 
 
-        if (!pai) {
-            return 0;
+        return pai
+
+            ? 1 +
+                obterNivelConta(
+                    pai,
+                    visitados
+                )
+
+            : 0;
+    }
+
+
+    /*
+     * ============================================================
+     * ABERTURA DOS MODAIS
+     * ============================================================
+     */
+
+    /*
+     * Novo Cliente/Fornecedor.
+     */
+    function abrirNovaPessoa() {
+        if (
+            !exigirEmpresa()
+        )
+        {
+            return;
         }
 
 
-        return (
-            1 +
-            obterNivelConta(
-                pai,
-                visitados
-            )
+        setPessoaEditando(
+            null
+        );
+
+
+        setOpenPessoa(
+            true
         );
     }
 
 
     /*
-     * Ordena o plano pelo código.
+     * Novo cadastro das outras abas.
      */
-    const planoContasOrdenado =
-        useMemo(
-            () =>
-                [...categorias]
-                    .sort(
-                        (
-                            a,
-                            b
-                        ) =>
-                            String(
-                                a.codigo ??
-                                ''
-                            )
-                                .localeCompare(
-                                    String(
-                                        b.codigo ??
-                                        ''
-                                    ),
+    function abrirNovoCadastro() {
+        if (
+            tab !==
+            'Empresas'
+            &&
+            !exigirEmpresa()
+        )
+        {
+            return;
+        }
 
-                                    'pt-BR',
 
-                                    {
-                                        numeric:
-                                            true
-                                    }
-                                )
-                    ),
-
-            [
-                categorias
-            ]
+        setEmpresaEditando(
+            null
         );
 
+
+        setCategoriaEditando(
+            null
+        );
+
+
+        setContaEditando(
+            null
+        );
+
+
+        setOpenCadastro(
+            true
+        );
+    }
+
+
+    /*
+     * ============================================================
+     * INTERFACE
+     * ============================================================
+     */
 
     return (
         <>
 
+            {/*
+             * Cabeçalho.
+             */}
             <div className="page-title">
 
                 <div>
@@ -1005,6 +1872,7 @@ export default function RegistryPage() {
                         <h1>
                             Cadastros
                         </h1>
+
 
                         {demo && (
                             <DemoPill />
@@ -1021,11 +1889,15 @@ export default function RegistryPage() {
                     {empresaAtiva && (
 
                         <small>
+
                             Empresa ativa:{' '}
+
                             {
-                                empresaAtiva.nomeFantasia ||
+                                empresaAtiva.nomeFantasia
+                                ||
                                 empresaAtiva.nome
                             }
+
                         </small>
 
                     )}
@@ -1035,6 +1907,9 @@ export default function RegistryPage() {
             </div>
 
 
+            {/*
+             * Indicadores.
+             */}
             <div className="kpi-grid four">
 
                 <Kpi
@@ -1045,7 +1920,6 @@ export default function RegistryPage() {
                             clientes.length
                         )
                     }
-                    trend="+12,7%"
                 />
 
 
@@ -1062,7 +1936,6 @@ export default function RegistryPage() {
                                 .length
                         )
                     }
-                    trend="+8,3%"
                 />
 
 
@@ -1074,7 +1947,6 @@ export default function RegistryPage() {
                             categorias.length
                         )
                     }
-                    trend="+0,0%"
                     tone="yellow"
                 />
 
@@ -1087,12 +1959,14 @@ export default function RegistryPage() {
                             contas.length
                         )
                     }
-                    trend="+0,0%"
                 />
 
             </div>
 
 
+            {/*
+             * Abas.
+             */}
             <div className="registry-tabs">
 
                 {(
@@ -1107,7 +1981,9 @@ export default function RegistryPage() {
                     item => (
 
                         <button
-                            key={item}
+                            key={
+                                item
+                            }
 
                             className={
                                 tab === item
@@ -1118,17 +1994,39 @@ export default function RegistryPage() {
                             }
 
                             onClick={() => {
+                                /*
+                                 * Troca a aba.
+                                 */
                                 setTab(
                                     item
                                 );
 
 
+                                /*
+                                 * Limpa filtros.
+                                 */
+                                setBusca(
+                                    ''
+                                );
+
+
+                                setStatusFilter(
+                                    'Todos'
+                                );
+
+
+                                /*
+                                 * Define primeira pessoa
+                                 * quando necessário.
+                                 */
                                 if (
                                     item ===
                                     'Clientes'
-                                ) {
+                                )
+                                {
                                     setSelected(
-                                        clientes[0] ??
+                                        clientes[0]
+                                        ??
                                         null
                                     );
                                 }
@@ -1137,9 +2035,11 @@ export default function RegistryPage() {
                                 if (
                                     item ===
                                     'Fornecedores'
-                                ) {
+                                )
+                                {
                                     setSelected(
-                                        fornecedores[0] ??
+                                        fornecedores[0]
+                                        ??
                                         null
                                     );
                                 }
@@ -1149,27 +2049,41 @@ export default function RegistryPage() {
                             {item}
 
                         </button>
+
                     )
                 )}
 
             </div>
 
 
+            {/*
+             * ====================================================
+             * CLIENTES E FORNECEDORES
+             * ====================================================
+             */}
             {(
                 tab ===
-                    'Clientes'
+                'Clientes'
+
                 ||
+
                 tab ===
-                    'Fornecedores'
-            ) ? (
+                'Fornecedores'
+            )
+            ? (
 
                 <div className="master-detail">
 
+                    {/*
+                     * Lista.
+                     */}
                     <Card
-                        title={tab}
+                        title={
+                            tab
+                        }
 
                         subtitle={
-                            `Gerencie seus ${tab.toLowerCase()} e mantenha as informações atualizadas.`
+                            `Gerencie seus ${tab.toLowerCase()} da empresa ativa.`
                         }
 
                         action={
@@ -1177,10 +2091,8 @@ export default function RegistryPage() {
                             <Button
                                 icon="plus"
 
-                                onClick={() =>
-                                    setOpenPessoa(
-                                        true
-                                    )
+                                onClick={
+                                    abrirNovaPessoa
                                 }
 
                                 disabled={
@@ -1203,24 +2115,60 @@ export default function RegistryPage() {
                         }
                     >
 
+                        {/*
+                         * Pesquisa e filtro.
+                         */}
                         <div className="search-row">
 
                             <input
-                                placeholder="Buscar por nome, documento, cidade ou contato..."
+                                value={
+                                    busca
+                                }
+
+                                onChange={
+                                    event =>
+                                        setBusca(
+                                            event.target.value
+                                        )
+                                }
+
+                                placeholder="Buscar por nome, documento, e-mail, telefone ou endereço..."
                             />
 
 
-                            <select>
+                           <select
+    value={statusFilter}
+    onChange={(event) => {
+        const valor = event.target.value;
 
-                                <option>
-                                    Todos os status
-                                </option>
+        if (
+            valor === 'Todos' ||
+            valor === 'Ativos' ||
+            valor === 'Inativos'
+        ) {
+            setStatusFilter(valor);
+        }
+    }}
+>
+    <option value="Todos">
+        Todos os status
+    </option>
 
-                            </select>
+    <option value="Ativos">
+        Ativos
+    </option>
+
+    <option value="Inativos">
+        Inativos
+    </option>
+</select>
 
                         </div>
 
 
+                        {/*
+                         * Tabela.
+                         */}
                         <div className="table-scroll">
 
                             <table>
@@ -1238,10 +2186,6 @@ export default function RegistryPage() {
                                         </th>
 
                                         <th>
-                                            Localização
-                                        </th>
-
-                                        <th>
                                             Contato
                                         </th>
 
@@ -1256,97 +2200,110 @@ export default function RegistryPage() {
 
                                 <tbody>
 
-                                    {people.map(
-                                        item => (
+                                    {
+                                        peopleFiltradas.map(
+                                            item => (
 
-                                            <tr
-                                                key={
-                                                    item.id
-                                                }
-
-                                                className={
-                                                    selected?.id ===
-                                                    item.id
-
-                                                        ? 'selected'
-
-                                                        : ''
-                                                }
-
-                                                onClick={() =>
-                                                    setSelected(
-                                                        item
-                                                    )
-                                                }
-                                            >
-
-                                                <td>
-                                                    {item.nome}
-                                                </td>
-
-                                                <td>
-                                                    {
-                                                        item.cpfCnpj ||
-                                                        '—'
+                                                <tr
+                                                    key={
+                                                        item.id
                                                     }
-                                                </td>
 
-                                                <td>
-                                                    {
-                                                        item.endereco ||
-                                                        '—'
+                                                    className={
+                                                        selected?.id
+                                                        ===
+                                                        item.id
+
+                                                            ? 'selected'
+
+                                                            : ''
                                                     }
-                                                </td>
 
-                                                <td>
-                                                    {
-                                                        item.telefone ||
-                                                        '—'
+                                                    onClick={() =>
+                                                        setSelected(
+                                                            item
+                                                        )
                                                     }
-                                                </td>
+                                                >
 
-                                                <td>
-
-                                                    <Badge
-                                                        tone={
-                                                            item.ativo
-
-                                                                ? 'success'
-
-                                                                : 'warning'
+                                                    <td>
+                                                        {
+                                                            item.nome
                                                         }
-                                                    >
+                                                    </td>
+
+
+                                                    <td>
+                                                        {
+                                                            item.cpfCnpj
+                                                            ||
+                                                            '—'
+                                                        }
+                                                    </td>
+
+
+                                                    <td>
 
                                                         {
-                                                            item.ativo
-
-                                                                ? 'Ativo'
-
-                                                                : 'Inativo'
+                                                            item.telefone
+                                                            ||
+                                                            item.email
+                                                            ||
+                                                            '—'
                                                         }
 
-                                                    </Badge>
+                                                    </td>
 
-                                                </td>
 
-                                            </tr>
+                                                    <td>
+
+                                                        <Badge
+                                                            tone={
+                                                                item.ativo
+
+                                                                    ? 'success'
+
+                                                                    : 'warning'
+                                                            }
+                                                        >
+
+                                                            {
+                                                                item.ativo
+
+                                                                    ? 'Ativo'
+
+                                                                    : 'Inativo'
+                                                            }
+
+                                                        </Badge>
+
+                                                    </td>
+
+                                                </tr>
+
+                                            )
                                         )
-                                    )}
+                                    }
 
                                 </tbody>
 
                             </table>
 
 
-                            {!people.length && (
+                            {
+                                !peopleFiltradas.length
+                                &&
                                 <EmptyState />
-                            )}
+                            }
 
                         </div>
 
                     </Card>
 
 
+                    {/*
+                     * Detalhes.
+                     */}
                     <Card
                         title={
                             `Dados do ${
@@ -1360,90 +2317,187 @@ export default function RegistryPage() {
                         }
                     >
 
-                        {selected ? (
+                        {selected
+                        ? (
 
-                            <div className="detail-form-preview">
+                            <div className="detail-panel">
 
-                                <Field label="Nome / Razão Social">
+                                <div className="detail-title">
 
-                                    <input
-                                        value={
-                                            selected.nome
+                                    <div>
+
+                                        <strong>
+                                            {
+                                                selected.nome
+                                            }
+                                        </strong>
+
+
+                                        <span>
+
+                                            {
+                                                selected.cpfCnpj
+                                                ||
+                                                'Sem documento informado'
+                                            }
+
+                                        </span>
+
+                                    </div>
+
+
+                                    <Badge
+                                        tone={
+                                            selected.ativo
+
+                                                ? 'success'
+
+                                                : 'warning'
                                         }
-                                        readOnly
-                                    />
+                                    >
 
-                                </Field>
+                                        {
+                                            selected.ativo
 
+                                                ? 'Ativo'
 
-                                <Field label="CPF / CNPJ">
-
-                                    <input
-                                        value={
-                                            selected.cpfCnpj ??
-                                            ''
+                                                : 'Inativo'
                                         }
-                                        readOnly
-                                    />
 
-                                </Field>
+                                    </Badge>
+
+                                </div>
 
 
-                                <Field label="E-mail">
+                                <dl>
 
-                                    <input
-                                        value={
-                                            selected.email ??
-                                            ''
+                                    <dt>
+                                        E-mail
+                                    </dt>
+
+                                    <dd>
+                                        {
+                                            selected.email
+                                            ||
+                                            '—'
                                         }
-                                        readOnly
-                                    />
-
-                                </Field>
+                                    </dd>
 
 
-                                <Field label="Telefone">
+                                    <dt>
+                                        Telefone
+                                    </dt>
 
-                                    <input
-                                        value={
-                                            selected.telefone ??
-                                            ''
+                                    <dd>
+                                        {
+                                            selected.telefone
+                                            ||
+                                            '—'
                                         }
-                                        readOnly
-                                    />
-
-                                </Field>
+                                    </dd>
 
 
-                                <Field label="Endereço">
+                                    <dt>
+                                        Endereço
+                                    </dt>
 
-                                    <input
-                                        value={
-                                            selected.endereco ??
-                                            ''
+                                    <dd>
+                                        {
+                                            selected.endereco
+                                            ||
+                                            '—'
                                         }
-                                        readOnly
-                                    />
-
-                                </Field>
+                                    </dd>
 
 
-                                <Field label="Observações">
+                                    <dt>
+                                        Observações
+                                    </dt>
 
-                                    <textarea
-                                        value={
-                                            selected.observacoes ??
-                                            ''
+                                    <dd>
+                                        {
+                                            selected.observacoes
+                                            ||
+                                            '—'
                                         }
-                                        readOnly
-                                        rows={4}
-                                    />
+                                    </dd>
 
-                                </Field>
+                                </dl>
+
+
+                                <div className="detail-actions">
+
+                                    {/*
+                                     * Editar.
+                                     */}
+                                    <Button
+                                        variant="secondary"
+
+                                        onClick={() => {
+                                            setPessoaEditando(
+                                                selected
+                                            );
+
+                                            setOpenPessoa(
+                                                true
+                                            );
+                                        }}
+                                    >
+                                        Editar
+                                    </Button>
+
+
+                                    {/*
+                                     * Inativar/Reativar.
+                                     */}
+                                    <Button
+                                        variant={
+                                            selected.ativo
+
+                                                ? 'secondary'
+
+                                                : 'success'
+                                        }
+
+                                        onClick={() =>
+                                            void alternarPessoa(
+                                                selected
+                                            )
+                                        }
+                                    >
+
+                                        {
+                                            selected.ativo
+
+                                                ? 'Inativar'
+
+                                                : 'Reativar'
+                                        }
+
+                                    </Button>
+
+
+                                    {/*
+                                     * Exclusão definitiva.
+                                     */}
+                                    <Button
+                                        variant="danger"
+
+                                        onClick={() =>
+                                            void excluirPessoa(
+                                                selected
+                                            )
+                                        }
+                                    >
+                                        Excluir
+                                    </Button>
+
+                                </div>
 
                             </div>
 
-                        ) : (
+                        )
+                        : (
 
                             <EmptyState />
 
@@ -1453,11 +2507,19 @@ export default function RegistryPage() {
 
                 </div>
 
-            ) : (
+            )
+            : (
 
+                /*
+                 * Empresas,
+                 * Plano de Contas e
+                 * Contas Financeiras.
+                 */
                 <RegistryOther
 
-                    tab={tab}
+                    tab={
+                        tab
+                    }
 
                     planoContas={
                         planoContasOrdenado
@@ -1507,6 +2569,20 @@ export default function RegistryPage() {
                         }
                     }
 
+                    onAlternarContaPlano={
+                        conta =>
+                            void alternarContaPlano(
+                                conta
+                            )
+                    }
+
+                    onExcluirContaPlano={
+                        conta =>
+                            void excluirContaPlano(
+                                conta
+                            )
+                    }
+
                     onEditarContaFinanceira={
                         conta => {
                             setContaEditando(
@@ -1518,38 +2594,73 @@ export default function RegistryPage() {
                             );
                         }
                     }
+
+                    onAlternarContaFinanceira={
+                        conta =>
+                            void alternarContaFinanceira(
+                                conta
+                            )
+                    }
+
+                    onExcluirContaFinanceira={
+                        conta =>
+                            void excluirContaFinanceira(
+                                conta
+                            )
+                    }
                 />
 
             )}
 
 
+            {/*
+             * ====================================================
+             * MODAL CLIENTE / FORNECEDOR
+             * ====================================================
+             */}
             <Modal
                 open={
                     openPessoa
                 }
 
                 title={
-                    `Novo ${
-                        tab ===
-                        'Fornecedores'
+                    pessoaEditando
 
-                            ? 'Fornecedor'
+                        ? `Editar ${
+                            tab ===
+                            'Fornecedores'
 
-                            : 'Cliente'
-                    }`
+                                ? 'Fornecedor'
+
+                                : 'Cliente'
+                        }`
+
+                        : `Novo ${
+                            tab ===
+                            'Fornecedores'
+
+                                ? 'Fornecedor'
+
+                                : 'Cliente'
+                        }`
                 }
 
-                onClose={() =>
+                onClose={() => {
                     setOpenPessoa(
                         false
-                    )
-                }
+                    );
+
+                    setPessoaEditando(
+                        null
+                    );
+                }}
             >
 
                 <form
                     className="form-grid"
+
                     onSubmit={
-                        createPerson
+                        salvarPessoa
                     }
                 >
 
@@ -1557,7 +2668,15 @@ export default function RegistryPage() {
 
                         <input
                             name="nome"
+
                             required
+
+                            defaultValue={
+                                pessoaEditando
+                                    ?.nome
+                                ??
+                                ''
+                            }
                         />
 
                     </Field>
@@ -1567,6 +2686,13 @@ export default function RegistryPage() {
 
                         <input
                             name="cpfCnpj"
+
+                            defaultValue={
+                                pessoaEditando
+                                    ?.cpfCnpj
+                                ??
+                                ''
+                            }
                         />
 
                     </Field>
@@ -1576,7 +2702,15 @@ export default function RegistryPage() {
 
                         <input
                             name="email"
+
                             type="email"
+
+                            defaultValue={
+                                pessoaEditando
+                                    ?.email
+                                ??
+                                ''
+                            }
                         />
 
                     </Field>
@@ -1586,6 +2720,13 @@ export default function RegistryPage() {
 
                         <input
                             name="telefone"
+
+                            defaultValue={
+                                pessoaEditando
+                                    ?.telefone
+                                ??
+                                ''
+                            }
                         />
 
                     </Field>
@@ -1595,6 +2736,13 @@ export default function RegistryPage() {
 
                         <input
                             name="endereco"
+
+                            defaultValue={
+                                pessoaEditando
+                                    ?.endereco
+                                ??
+                                ''
+                            }
                         />
 
                     </Field>
@@ -1604,7 +2752,15 @@ export default function RegistryPage() {
 
                         <textarea
                             name="observacoes"
+
                             rows={3}
+
+                            defaultValue={
+                                pessoaEditando
+                                    ?.observacoes
+                                ??
+                                ''
+                            }
                         />
 
                     </Field>
@@ -1615,24 +2771,28 @@ export default function RegistryPage() {
                         <Button
                             variant="secondary"
 
-                            onClick={() =>
+                            onClick={() => {
                                 setOpenPessoa(
                                     false
-                                )
-                            }
+                                );
+
+                                setPessoaEditando(
+                                    null
+                                );
+                            }}
                         >
-
                             Cancelar
-
                         </Button>
 
 
                         <Button
                             type="submit"
+
+                            disabled={
+                                busy
+                            }
                         >
-
                             Salvar
-
                         </Button>
 
                     </div>
@@ -1642,9 +2802,15 @@ export default function RegistryPage() {
             </Modal>
 
 
+            {/*
+             * ====================================================
+             * MODAL EMPRESA
+             * ====================================================
+             */}
             <Modal
                 open={
-                    openCadastro &&
+                    openCadastro
+                    &&
                     tab ===
                     'Empresas'
                 }
@@ -1670,6 +2836,7 @@ export default function RegistryPage() {
 
                 <form
                     className="form-grid"
+
                     onSubmit={
                         salvarEmpresa
                     }
@@ -1679,6 +2846,7 @@ export default function RegistryPage() {
 
                         <input
                             name="nome"
+
                             required
 
                             defaultValue={
@@ -1728,6 +2896,7 @@ export default function RegistryPage() {
 
                         <input
                             name="email"
+
                             type="email"
 
                             defaultValue={
@@ -1788,24 +2957,18 @@ export default function RegistryPage() {
                                 );
                             }}
                         >
-
                             Cancelar
-
                         </Button>
 
 
                         <Button
                             type="submit"
-                        >
 
-                            {
-                                empresaEditando
-
-                                    ? 'Salvar Alterações'
-
-                                    : 'Cadastrar Empresa'
+                            disabled={
+                                busy
                             }
-
+                        >
+                            Salvar
                         </Button>
 
                     </div>
@@ -1815,9 +2978,15 @@ export default function RegistryPage() {
             </Modal>
 
 
+            {/*
+             * ====================================================
+             * MODAL PLANO DE CONTAS
+             * ====================================================
+             */}
             <Modal
                 open={
-                    openCadastro &&
+                    openCadastro
+                    &&
                     tab ===
                     'Plano de Contas'
                 }
@@ -1843,6 +3012,7 @@ export default function RegistryPage() {
 
                 <form
                     className="form-grid"
+
                     onSubmit={
                         salvarContaPlano
                     }
@@ -1852,6 +3022,8 @@ export default function RegistryPage() {
 
                         <input
                             name="codigo"
+
+                            required
 
                             placeholder="Ex.: 2.01.01"
 
@@ -1905,6 +3077,7 @@ export default function RegistryPage() {
                                 Receita
                             </option>
 
+
                             <option value="Despesa">
                                 Despesa
                             </option>
@@ -1935,52 +3108,53 @@ export default function RegistryPage() {
                             {
                                 planoContasOrdenado
 
+                                    /*
+                                     * Evita selecionar
+                                     * a própria conta como pai.
+                                     */
                                     .filter(
                                         item =>
-                                            item.id !==
-                                            categoriaEditando
-                                                ?.id
+                                            item.id
+                                            !==
+                                            categoriaEditando?.id
                                     )
 
                                     .map(
-                                        item => {
-                                            const nivel =
-                                                obterNivelConta(
-                                                    item
-                                                );
+                                        item => (
 
+                                            <option
+                                                key={
+                                                    item.id
+                                                }
 
-                                            return (
+                                                value={
+                                                    item.id
+                                                }
+                                            >
 
-                                                <option
-                                                    key={
-                                                        item.id
-                                                    }
-
-                                                    value={
-                                                        item.id
-                                                    }
-                                                >
-
-                                                    {
-                                                        '— '.repeat(
-                                                            nivel
+                                                {
+                                                    '— '.repeat(
+                                                        obterNivelConta(
+                                                            item
                                                         )
-                                                    }
+                                                    )
+                                                }
 
-                                                    {
-                                                        item.codigo
+                                                {
+                                                    item.codigo
 
-                                                            ? `${item.codigo} - `
+                                                        ? `${item.codigo} - `
 
-                                                            : ''
-                                                    }
+                                                        : ''
+                                                }
 
-                                                    {item.nome}
+                                                {
+                                                    item.nome
+                                                }
 
-                                                </option>
-                                            );
-                                        }
+                                            </option>
+
+                                        )
                                     )
                             }
 
@@ -2004,24 +3178,18 @@ export default function RegistryPage() {
                                 );
                             }}
                         >
-
                             Cancelar
-
                         </Button>
 
 
                         <Button
                             type="submit"
-                        >
 
-                            {
-                                categoriaEditando
-
-                                    ? 'Salvar Alterações'
-
-                                    : 'Cadastrar Conta'
+                            disabled={
+                                busy
                             }
-
+                        >
+                            Salvar
                         </Button>
 
                     </div>
@@ -2031,9 +3199,15 @@ export default function RegistryPage() {
             </Modal>
 
 
+            {/*
+             * ====================================================
+             * MODAL CONTA FINANCEIRA
+             * ====================================================
+             */}
             <Modal
                 open={
-                    openCadastro &&
+                    openCadastro
+                    &&
                     tab ===
                     'Contas Financeiras'
                 }
@@ -2059,6 +3233,7 @@ export default function RegistryPage() {
 
                 <form
                     className="form-grid"
+
                     onSubmit={
                         salvarContaFinanceira
                     }
@@ -2068,9 +3243,8 @@ export default function RegistryPage() {
 
                         <input
                             name="nome"
-                            required
 
-                            placeholder="Ex.: Itaú Empresa"
+                            required
 
                             defaultValue={
                                 contaEditando
@@ -2102,13 +3276,16 @@ export default function RegistryPage() {
                                 Conta Corrente
                             </option>
 
+
                             <option value="Poupança">
                                 Poupança
                             </option>
 
+
                             <option value="Caixa">
                                 Caixa
                             </option>
+
 
                             <option value="Carteira Digital">
                                 Carteira Digital
@@ -2123,8 +3300,6 @@ export default function RegistryPage() {
 
                         <input
                             name="instituicao"
-
-                            placeholder="Ex.: Banco Itaú"
 
                             defaultValue={
                                 contaEditando
@@ -2184,9 +3359,32 @@ export default function RegistryPage() {
                                 ??
                                 0
                             }
+
+                            readOnly={
+                                Boolean(
+                                    contaEditando
+                                )
+                            }
                         />
 
                     </Field>
+
+
+                    {/*
+                     * Explicação apresentada somente
+                     * durante a edição.
+                     */}
+                    {contaEditando && (
+
+                        <div className="info-note">
+
+                            O saldo inicial é definido somente no cadastro.
+                            Depois disso, o saldo deve mudar por pagamentos,
+                            recebimentos ou transferências.
+
+                        </div>
+
+                    )}
 
 
                     <div className="form-actions">
@@ -2204,24 +3402,18 @@ export default function RegistryPage() {
                                 );
                             }}
                         >
-
                             Cancelar
-
                         </Button>
 
 
                         <Button
                             type="submit"
-                        >
 
-                            {
-                                contaEditando
-
-                                    ? 'Salvar Alterações'
-
-                                    : 'Cadastrar Conta'
+                            disabled={
+                                busy
                             }
-
+                        >
+                            Salvar
                         </Button>
 
                     </div>
@@ -2236,11 +3428,15 @@ export default function RegistryPage() {
 
 
 /*
- * Componente utilizado para:
+ * ================================================================
+ * COMPONENTE DOS DEMAIS CADASTROS
+ * ================================================================
  *
- * Empresa
- * Plano de Contas
- * Contas Financeiras
+ * Responsável por exibir:
+ *
+ * - Empresas;
+ * - Plano de Contas;
+ * - Contas Financeiras.
  */
 function RegistryOther({
     tab,
@@ -2252,7 +3448,11 @@ function RegistryOther({
     onNovo,
     onEditarEmpresa,
     onEditarContaPlano,
-    onEditarContaFinanceira
+    onAlternarContaPlano,
+    onExcluirContaPlano,
+    onEditarContaFinanceira,
+    onAlternarContaFinanceira,
+    onExcluirContaFinanceira
 }: {
     tab:
         Tab;
@@ -2290,26 +3490,55 @@ function RegistryOther({
                 Categoria
         ) => void;
 
+    onAlternarContaPlano:
+        (
+            categoria:
+                Categoria
+        ) => void;
+
+    onExcluirContaPlano:
+        (
+            categoria:
+                Categoria
+        ) => void;
+
     onEditarContaFinanceira:
+        (
+            conta:
+                ContaFinanceira
+        ) => void;
+
+    onAlternarContaFinanceira:
+        (
+            conta:
+                ContaFinanceira
+        ) => void;
+
+    onExcluirContaFinanceira:
         (
             conta:
                 ContaFinanceira
         ) => void;
 }) {
     /*
+     * ============================================================
      * EMPRESAS
+     * ============================================================
      */
     if (
         tab ===
         'Empresas'
-    ) {
+    )
+    {
         return (
+
             <Card
                 title="Empresas"
 
                 subtitle="Cadastre e mantenha as empresas utilizadas no PayControl."
 
                 action={
+
                     <Button
                         icon="plus"
 
@@ -2334,17 +3563,21 @@ function RegistryOther({
                                     Razão Social
                                 </th>
 
+
                                 <th>
                                     Nome Fantasia
                                 </th>
+
 
                                 <th>
                                     CPF / CNPJ
                                 </th>
 
+
                                 <th>
                                     Status
                                 </th>
+
 
                                 <th>
                                     Ações
@@ -2357,91 +3590,100 @@ function RegistryOther({
 
                         <tbody>
 
-                            {empresas.map(
-                                empresa => (
+                            {
+                                empresas.map(
+                                    empresa => (
 
-                                    <tr
-                                        key={
-                                            empresa.id
-                                        }
-                                    >
-
-                                        <td>
-                                            {empresa.nome}
-                                        </td>
-
-                                        <td>
-                                            {
-                                                empresa.nomeFantasia ||
-                                                '—'
+                                        <tr
+                                            key={
+                                                empresa.id
                                             }
-                                        </td>
+                                        >
 
-                                        <td>
-                                            {
-                                                empresa.cpfCnpj ||
-                                                '—'
-                                            }
-                                        </td>
-
-                                        <td>
-
-                                            <Badge
-                                                tone={
-                                                    empresa.ativa
-
-                                                        ? 'success'
-
-                                                        : 'warning'
-                                                }
-                                            >
-
+                                            <td>
                                                 {
-                                                    empresa.ativa
-
-                                                        ? 'Ativa'
-
-                                                        : 'Inativa'
+                                                    empresa.nome
                                                 }
+                                            </td>
 
-                                            </Badge>
 
-                                        </td>
-
-                                        <td>
-
-                                            <Button
-                                                variant="ghost"
-
-                                                onClick={() =>
-                                                    onEditarEmpresa(
-                                                        empresa
-                                                    )
+                                            <td>
+                                                {
+                                                    empresa.nomeFantasia
+                                                    ||
+                                                    '—'
                                                 }
-                                            >
+                                            </td>
 
-                                                Editar
 
-                                            </Button>
+                                            <td>
+                                                {
+                                                    empresa.cpfCnpj
+                                                    ||
+                                                    '—'
+                                                }
+                                            </td>
 
-                                        </td>
 
-                                    </tr>
+                                            <td>
+
+                                                <Badge
+                                                    tone={
+                                                        empresa.ativa
+
+                                                            ? 'success'
+
+                                                            : 'warning'
+                                                    }
+                                                >
+
+                                                    {
+                                                        empresa.ativa
+
+                                                            ? 'Ativa'
+
+                                                            : 'Inativa'
+                                                    }
+
+                                                </Badge>
+
+                                            </td>
+
+
+                                            <td>
+
+                                                <Button
+                                                    variant="ghost"
+
+                                                    onClick={() =>
+                                                        onEditarEmpresa(
+                                                            empresa
+                                                        )
+                                                    }
+                                                >
+                                                    Editar
+                                                </Button>
+
+                                            </td>
+
+                                        </tr>
+
+                                    )
                                 )
-                            )}
+                            }
 
                         </tbody>
 
                     </table>
 
 
-                    {!empresas.length && (
-
+                    {
+                        !empresas.length
+                        &&
                         <EmptyState
                             text="Nenhuma empresa cadastrada."
                         />
-
-                    )}
+                    }
 
                 </div>
 
@@ -2451,19 +3693,24 @@ function RegistryOther({
 
 
     /*
+     * ============================================================
      * CONTAS FINANCEIRAS
+     * ============================================================
      */
     if (
         tab ===
         'Contas Financeiras'
-    ) {
+    )
+    {
         return (
+
             <Card
                 title="Contas Financeiras"
 
-                subtitle="Cadastre bancos, caixas, poupanças e outras contas utilizadas pela empresa ativa."
+                subtitle="Contas bancárias, caixa e carteiras da empresa ativa."
 
                 action={
+
                     <Button
                         icon="plus"
 
@@ -2488,25 +3735,31 @@ function RegistryOther({
                                     Nome
                                 </th>
 
+
                                 <th>
                                     Tipo
                                 </th>
+
 
                                 <th>
                                     Instituição
                                 </th>
 
+
                                 <th>
                                     Agência / Conta
                                 </th>
+
 
                                 <th>
                                     Saldo Inicial
                                 </th>
 
+
                                 <th>
                                     Status
                                 </th>
+
 
                                 <th>
                                     Ações
@@ -2519,123 +3772,173 @@ function RegistryOther({
 
                         <tbody>
 
-                            {contas.map(
-                                conta => (
+                            {
+                                contas.map(
+                                    conta => (
 
-                                    <tr
-                                        key={
-                                            conta.id
-                                        }
-                                    >
-
-                                        <td>
-                                            {conta.nome}
-                                        </td>
-
-                                        <td>
-                                            {conta.tipo}
-                                        </td>
-
-                                        <td>
-                                            {
-                                                conta.instituicao ||
-                                                '—'
+                                        <tr
+                                            key={
+                                                conta.id
                                             }
-                                        </td>
+                                        >
 
-                                        <td>
-
-                                            {
-                                                conta.agencia ||
-                                                '—'
-                                            }
-
-                                            {' / '}
-
-                                            {
-                                                conta.numeroConta ||
-                                                '—'
-                                            }
-
-                                        </td>
-
-                                        <td>
-
-                                            {
-                                                conta.saldoInicial
-                                                    .toLocaleString(
-                                                        'pt-BR',
-
-                                                        {
-                                                            style:
-                                                                'currency',
-
-                                                            currency:
-                                                                'BRL'
-                                                        }
-                                                    )
-                                            }
-
-                                        </td>
-
-                                        <td>
-
-                                            <Badge
-                                                tone={
-                                                    conta.ativa
-
-                                                        ? 'success'
-
-                                                        : 'warning'
+                                            <td>
+                                                {
+                                                    conta.nome
                                                 }
-                                            >
+                                            </td>
+
+
+                                            <td>
+                                                {
+                                                    conta.tipo
+                                                }
+                                            </td>
+
+
+                                            <td>
+                                                {
+                                                    conta.instituicao
+                                                    ||
+                                                    '—'
+                                                }
+                                            </td>
+
+
+                                            <td>
 
                                                 {
-                                                    conta.ativa
-
-                                                        ? 'Ativa'
-
-                                                        : 'Inativa'
+                                                    conta.agencia
+                                                    ||
+                                                    '—'
                                                 }
 
-                                            </Badge>
+                                                {' / '}
 
-                                        </td>
+                                                {
+                                                    conta.numeroConta
+                                                    ||
+                                                    '—'
+                                                }
 
-                                        <td>
+                                            </td>
 
-                                            <Button
-                                                variant="ghost"
 
-                                                onClick={() =>
-                                                    onEditarContaFinanceira(
-                                                        conta
+                                            <td>
+                                                {
+                                                    money(
+                                                        conta.saldoInicial
                                                     )
                                                 }
-                                            >
+                                            </td>
 
-                                                Editar
 
-                                            </Button>
+                                            <td>
 
-                                        </td>
+                                                <Badge
+                                                    tone={
+                                                        conta.ativa
 
-                                    </tr>
+                                                            ? 'success'
+
+                                                            : 'warning'
+                                                    }
+                                                >
+
+                                                    {
+                                                        conta.ativa
+
+                                                            ? 'Ativa'
+
+                                                            : 'Inativa'
+                                                    }
+
+                                                </Badge>
+
+                                            </td>
+
+
+                                            <td>
+
+                                                <div className="action-row">
+
+                                                    {/*
+                                                     * Editar.
+                                                     */}
+                                                    <Button
+                                                        variant="ghost"
+
+                                                        onClick={() =>
+                                                            onEditarContaFinanceira(
+                                                                conta
+                                                            )
+                                                        }
+                                                    >
+                                                        Editar
+                                                    </Button>
+
+
+                                                    {/*
+                                                     * Inativar/Reativar.
+                                                     */}
+                                                    <Button
+                                                        variant="ghost"
+
+                                                        onClick={() =>
+                                                            onAlternarContaFinanceira(
+                                                                conta
+                                                            )
+                                                        }
+                                                    >
+
+                                                        {
+                                                            conta.ativa
+
+                                                                ? 'Inativar'
+
+                                                                : 'Reativar'
+                                                        }
+
+                                                    </Button>
+
+
+                                                    {/*
+                                                     * Excluir.
+                                                     */}
+                                                    <Button
+                                                        variant="danger"
+
+                                                        onClick={() =>
+                                                            onExcluirContaFinanceira(
+                                                                conta
+                                                            )
+                                                        }
+                                                    >
+                                                        Excluir
+                                                    </Button>
+
+                                                </div>
+
+                                            </td>
+
+                                        </tr>
+
+                                    )
                                 )
-                            )}
+                            }
 
                         </tbody>
 
                     </table>
 
 
-                    {!contas.length && (
-
+                    {
+                        !contas.length
+                        &&
                         <EmptyState
-                            text="Nenhuma conta financeira cadastrada para a empresa ativa."
+                            text="Nenhuma conta financeira cadastrada."
                         />
-
-                    )}
+                    }
 
                 </div>
 
@@ -2645,15 +3948,20 @@ function RegistryOther({
 
 
     /*
+     * ============================================================
      * PLANO DE CONTAS
+     * ============================================================
      */
+
     return (
+
         <Card
             title="Plano de Contas"
 
-            subtitle="Organize receitas e despesas em uma estrutura hierárquica da empresa ativa."
+            subtitle="As contas cadastradas aqui classificam receitas e despesas."
 
             action={
+
                 <Button
                     icon="plus"
 
@@ -2678,21 +3986,26 @@ function RegistryOther({
                                 Código
                             </th>
 
+
                             <th>
                                 Conta
                             </th>
+
 
                             <th>
                                 Tipo
                             </th>
 
+
                             <th>
                                 Conta Pai
                             </th>
 
+
                             <th>
                                 Status
                             </th>
+
 
                             <th>
                                 Ações
@@ -2705,166 +4018,225 @@ function RegistryOther({
 
                     <tbody>
 
-                        {planoContas.map(
-                            contaPlano => {
-                                const pai =
-                                    categorias.find(
-                                        item =>
-                                            item.id ===
-                                            contaPlano.categoriaPaiId
-                                    );
+                        {
+                            planoContas.map(
+                                conta => {
+                                    /*
+                                     * Localiza a conta pai.
+                                     */
+                                    const pai =
+                                        categorias.find(
+                                            item =>
+                                                item.id
+                                                ===
+                                                conta.categoriaPaiId
+                                        );
 
 
-                                const nivel =
-                                    obterNivelConta(
-                                        contaPlano
-                                    );
+                                    /*
+                                     * Calcula o nível hierárquico.
+                                     */
+                                    const nivel =
+                                        obterNivelConta(
+                                            conta
+                                        );
 
 
-                                return (
+                                    return (
 
-                                    <tr
-                                        key={
-                                            contaPlano.id
-                                        }
-                                    >
-
-                                        <td>
-                                            {
-                                                contaPlano.codigo ||
-                                                '—'
+                                        <tr
+                                            key={
+                                                conta.id
                                             }
-                                        </td>
+                                        >
+
+                                            <td>
+                                                {
+                                                    conta.codigo
+                                                    ||
+                                                    '—'
+                                                }
+                                            </td>
 
 
-                                        <td>
+                                            <td>
 
-                                            <div
-                                                style={{
-                                                    paddingLeft:
-                                                        `${nivel * 24}px`
-                                                }}
-                                            >
+                                                <div
+                                                    style={{
+                                                        paddingLeft:
+                                                            `${nivel * 24}px`
+                                                    }}
+                                                >
 
-                                                {nivel > 0 && (
-                                                    <span>
-                                                        └─{' '}
-                                                    </span>
-                                                )}
-
-
-                                                <strong>
                                                     {
-                                                        contaPlano.nome
+                                                        nivel > 0
+                                                        &&
+                                                        <span>
+                                                            └─{' '}
+                                                        </span>
                                                     }
-                                                </strong>
-
-                                            </div>
-
-                                        </td>
 
 
-                                        <td>
+                                                    <strong>
+                                                        {
+                                                            conta.nome
+                                                        }
+                                                    </strong>
 
-                                            <Badge
-                                                tone={
-                                                    contaPlano.tipo ===
-                                                    'Receita'
+                                                </div>
 
-                                                        ? 'success'
-
-                                                        : 'danger'
-                                                }
-                                            >
-
-                                                {
-                                                    contaPlano.tipo
-                                                }
-
-                                            </Badge>
-
-                                        </td>
+                                            </td>
 
 
-                                        <td>
+                                            <td>
 
-                                            {
-                                                pai
+                                                <Badge
+                                                    tone={
+                                                        conta.tipo
+                                                        ===
+                                                        'Receita'
 
-                                                    ? (
-                                                        pai.codigo
+                                                            ? 'success'
 
-                                                            ? `${pai.codigo} - ${pai.nome}`
+                                                            : 'danger'
+                                                    }
+                                                >
 
-                                                            : pai.nome
-                                                    )
+                                                    {
+                                                        conta.tipo
+                                                    }
 
-                                                    : 'Conta Raiz'
-                                            }
+                                                </Badge>
 
-                                        </td>
+                                            </td>
 
 
-                                        <td>
-
-                                            <Badge
-                                                tone={
-                                                    contaPlano.ativa
-
-                                                        ? 'success'
-
-                                                        : 'warning'
-                                                }
-                                            >
+                                            <td>
 
                                                 {
-                                                    contaPlano.ativa
+                                                    pai
 
-                                                        ? 'Ativa'
+                                                        ? `${
+                                                            pai.codigo
 
-                                                        : 'Inativa'
+                                                                ? `${pai.codigo} - `
+
+                                                                : ''
+                                                        }${pai.nome}`
+
+                                                        : 'Conta Raiz'
                                                 }
 
-                                            </Badge>
-
-                                        </td>
+                                            </td>
 
 
-                                        <td>
+                                            <td>
 
-                                            <Button
-                                                variant="ghost"
+                                                <Badge
+                                                    tone={
+                                                        conta.ativa
 
-                                                onClick={() =>
-                                                    onEditarContaPlano(
-                                                        contaPlano
-                                                    )
-                                                }
-                                            >
+                                                            ? 'success'
 
-                                                Editar
+                                                            : 'warning'
+                                                    }
+                                                >
 
-                                            </Button>
+                                                    {
+                                                        conta.ativa
 
-                                        </td>
+                                                            ? 'Ativa'
 
-                                    </tr>
-                                );
-                            }
-                        )}
+                                                            : 'Inativa'
+                                                    }
+
+                                                </Badge>
+
+                                            </td>
+
+
+                                            <td>
+
+                                                <div className="action-row">
+
+                                                    {/*
+                                                     * Editar.
+                                                     */}
+                                                    <Button
+                                                        variant="ghost"
+
+                                                        onClick={() =>
+                                                            onEditarContaPlano(
+                                                                conta
+                                                            )
+                                                        }
+                                                    >
+                                                        Editar
+                                                    </Button>
+
+
+                                                    {/*
+                                                     * Inativar/Reativar.
+                                                     */}
+                                                    <Button
+                                                        variant="ghost"
+
+                                                        onClick={() =>
+                                                            onAlternarContaPlano(
+                                                                conta
+                                                            )
+                                                        }
+                                                    >
+
+                                                        {
+                                                            conta.ativa
+
+                                                                ? 'Inativar'
+
+                                                                : 'Reativar'
+                                                        }
+
+                                                    </Button>
+
+
+                                                    {/*
+                                                     * Exclusão.
+                                                     */}
+                                                    <Button
+                                                        variant="danger"
+
+                                                        onClick={() =>
+                                                            onExcluirContaPlano(
+                                                                conta
+                                                            )
+                                                        }
+                                                    >
+                                                        Excluir
+                                                    </Button>
+
+                                                </div>
+
+                                            </td>
+
+                                        </tr>
+
+                                    );
+                                }
+                            )
+                        }
 
                     </tbody>
 
                 </table>
 
 
-                {!planoContas.length && (
-
+                {
+                    !planoContas.length
+                    &&
                     <EmptyState
-                        text="Nenhuma conta cadastrada no Plano de Contas da empresa ativa."
+                        text="Nenhuma conta cadastrada no Plano de Contas."
                     />
-
-                )}
+                }
 
             </div>
 

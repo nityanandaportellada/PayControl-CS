@@ -1,4 +1,3 @@
-// Define o formato dos dados usados por esta parte da aplicação.
 export type Empresa = {
     id: number;
     nome: string;
@@ -9,7 +8,8 @@ export type Empresa = {
     endereco?: string | null;
     ativa: boolean;
 };
-// Define o formato dos dados usados por esta parte da aplicação.
+
+
 export type Pessoa = {
     id: number;
     empresaId?: number | null;
@@ -21,17 +21,22 @@ export type Pessoa = {
     observacoes?: string | null;
     ativo: boolean;
 };
-// Define o formato dos dados usados por esta parte da aplicação.
+
+
 export type Categoria = {
     id: number;
     empresaId?: number | null;
     nome: string;
-    tipo: 'Receita' | 'Despesa' | string;
+    tipo:
+        | 'Receita'
+        | 'Despesa'
+        | string;
     categoriaPaiId?: number | null;
     codigo?: string | null;
     ativa: boolean;
 };
-// Define o formato dos dados usados por esta parte da aplicação.
+
+
 export type ContaFinanceira = {
     id: number;
     empresaId?: number | null;
@@ -43,77 +48,145 @@ export type ContaFinanceira = {
     saldoInicial: number;
     ativa: boolean;
 };
-// Define o formato dos dados usados por esta parte da aplicação.
+
+
 export type ContaPagar = {
     id: number;
     empresaId?: number | null;
     fornecedorId?: number | null;
     categoriaId?: number | null;
     contaFinanceiraId?: number | null;
+
     descricao: string;
     valor: number;
+
     dataEmissao: string;
     dataVencimento: string;
     dataPagamento?: string | null;
+
     status: string;
+
     formaPagamento?: string | null;
+
     numeroDocumento?: string | null;
     serieDocumento?: string | null;
     chaveFiscal?: string | null;
+
     observacoes?: string | null;
+
     parcelaNumero: number;
     parcelaTotal: number;
+
+    grupoParcelamentoId?: string | null;
+    recorrenciaId?: number | null;
 };
-// Define o formato dos dados usados por esta parte da aplicação.
+
+
 export type Receita = {
     id: number;
     empresaId?: number | null;
+
     clienteId?: number | null;
     categoriaId?: number | null;
     contaFinanceiraId?: number | null;
+
     descricao: string;
     tipo: string;
     valor: number;
+
     dataEmissao: string;
     dataVencimento: string;
     dataRecebimento?: string | null;
+
     status: string;
+
     formaRecebimento?: string | null;
+
     numeroDocumento?: string | null;
     serieDocumento?: string | null;
     chaveFiscal?: string | null;
+
     observacoes?: string | null;
+
     parcelaNumero: number;
     parcelaTotal: number;
+
+    grupoParcelamentoId?: string | null;
+    recorrenciaId?: number | null;
 };
-// Define o formato dos dados usados por esta parte da aplicação.
+
+
+export type Transferencia = {
+    id: number;
+    empresaId?: number | null;
+
+    contaOrigemId: number;
+    contaDestinoId: number;
+
+    valor: number;
+
+    data: string;
+
+    descricao?: string | null;
+
+    status: string;
+
+    motivoCancelamento?: string | null;
+};
+
+
 export type Movimento = {
     data: string;
+
     natureza: string;
+
     origem: string;
+
     id: number;
+
     descricao: string;
+
     entrada: number;
+
     saida: number;
+
     saldo: number;
+
     status: string;
+
     contaFinanceiraId?: number | null;
+
     projetado: boolean;
 };
-// Define o formato dos dados usados por esta parte da aplicação.
+
+
 export type Fluxo = {
     saldoInicial: number;
+
     entradasRealizadas: number;
+
     saidasRealizadas: number;
+
     saldoRealizado: number;
+
     entradasProjetadas: number;
+
     saidasProjetadas: number;
+
     saldoProjetado: number;
+
     lancamentos: Movimento[];
 };
-// Define o formato dos dados usados por esta parte da aplicação.
+
+
 export type AlertItem = {
-    level: 'danger' | 'warning' | 'info' | 'success';
+    level:
+        | 'danger'
+        | 'warning'
+        | 'info'
+        | 'success';
+
     title: string;
+
     detail: string;
 };
