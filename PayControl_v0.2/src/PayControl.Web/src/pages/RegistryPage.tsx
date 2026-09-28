@@ -1,13 +1,26 @@
-import { useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
+import {
+    useEffect,
+    useMemo,
+    useState
+} from 'react';
 
-import { api, loadWithFallback } from '../api';
+import type {
+    FormEvent
+} from 'react';
+
+import {
+    api,
+    loadWithFallback
+} from '../api';
+
+import {
+    useCompany
+} from '../contexts/CompanyContext';
 
 import {
     mockCategorias,
     mockClientes,
     mockContasFinanceiras,
-    mockEmpresas,
     mockFornecedores
 } from '../mock';
 
@@ -31,12 +44,10 @@ import {
 
 
 /*
- * Define as abas disponíveis na tela de Cadastros.
+ * Abas disponíveis.
  *
- * "Categorias" foi removida.
- *
- * O Plano de Contas passa a ser a estrutura única
- * utilizada para classificar receitas e despesas.
+ * Categorias foi unificada
+ * com Plano de Contas.
  */
 type Tab =
     | 'Empresas'
@@ -47,254 +58,360 @@ type Tab =
 
 
 /*
- * Componente principal da página Cadastros.
+ * Página principal dos cadastros.
  */
 export default function RegistryPage() {
-
     /*
-     * Aba atualmente selecionada.
+     * Empresa global.
      */
-    const [tab, setTab] =
-        useState<Tab>('Clientes');
-
-
-    /*
-     * Dados carregados da API.
-     */
-    const [clientes, setClientes] =
-        useState<Pessoa[]>([]);
-
-    const [fornecedores, setFornecedores] =
-        useState<Pessoa[]>([]);
-
-    const [categorias, setCategorias] =
-        useState<Categoria[]>([]);
-
-    const [contas, setContas] =
-        useState<ContaFinanceira[]>([]);
-
-    const [empresas, setEmpresas] =
-        useState<Empresa[]>([]);
+    const {
+        empresas,
+        empresaAtiva,
+        empresaAtivaId,
+        atualizarEmpresas
+    } =
+        useCompany();
 
 
     /*
-     * Indica se os dados demonstrativos
-     * estão sendo utilizados.
+     * Aba atual.
      */
-    const [demo, setDemo] =
-        useState(false);
+    const [
+        tab,
+        setTab
+    ] =
+        useState<Tab>(
+            'Clientes'
+        );
 
 
     /*
-     * Controla o modal de Cliente
-     * e Fornecedor.
+     * Dados da empresa ativa.
      */
-    const [openPessoa, setOpenPessoa] =
-        useState(false);
+    const [
+        clientes,
+        setClientes
+    ] =
+        useState<Pessoa[]>(
+            []
+        );
+
+
+    const [
+        fornecedores,
+        setFornecedores
+    ] =
+        useState<Pessoa[]>(
+            []
+        );
+
+
+    const [
+        categorias,
+        setCategorias
+    ] =
+        useState<Categoria[]>(
+            []
+        );
+
+
+    const [
+        contas,
+        setContas
+    ] =
+        useState<
+            ContaFinanceira[]
+        >(
+            []
+        );
 
 
     /*
-     * Controla os modais de:
-     *
-     * - Empresa;
-     * - Plano de Contas;
-     * - Conta Financeira.
+     * Modo demonstrativo.
      */
-    const [openCadastro, setOpenCadastro] =
-        useState(false);
+    const [
+        demo,
+        setDemo
+    ] =
+        useState(
+            false
+        );
 
 
     /*
-     * Cliente ou fornecedor selecionado.
+     * Modais.
      */
-    const [selected, setSelected] =
-        useState<Pessoa | null>(null);
+    const [
+        openPessoa,
+        setOpenPessoa
+    ] =
+        useState(
+            false
+        );
+
+
+    const [
+        openCadastro,
+        setOpenCadastro
+    ] =
+        useState(
+            false
+        );
 
 
     /*
-     * Empresa atualmente sendo editada.
-     *
-     * Quando for null, significa que será
-     * criada uma nova empresa.
+     * Registro selecionado.
      */
-    const [empresaEditando, setEmpresaEditando] =
-        useState<Empresa | null>(null);
+    const [
+        selected,
+        setSelected
+    ] =
+        useState<
+            Pessoa | null
+        >(
+            null
+        );
+
+
+    /*
+     * Empresa sendo editada.
+     */
+    const [
+        empresaEditando,
+        setEmpresaEditando
+    ] =
+        useState<
+            Empresa | null
+        >(
+            null
+        );
 
 
     /*
      * Conta do Plano de Contas
-     * atualmente sendo editada.
-     */
-    const [categoriaEditando, setCategoriaEditando] =
-        useState<Categoria | null>(null);
-
-
-    /*
-     * Conta financeira atualmente
      * sendo editada.
      */
-    const [contaEditando, setContaEditando] =
-        useState<ContaFinanceira | null>(null);
+    const [
+        categoriaEditando,
+        setCategoriaEditando
+    ] =
+        useState<
+            Categoria | null
+        >(
+            null
+        );
 
 
     /*
-     * --------------------------------------------------
-     * CARREGAMENTO DOS DADOS
-     * --------------------------------------------------
+     * Conta financeira
+     * sendo editada.
      */
+    const [
+        contaEditando,
+        setContaEditando
+    ] =
+        useState<
+            ContaFinanceira | null
+        >(
+            null
+        );
 
 
     /*
-     * Busca os cadastros necessários para a tela.
+     * Carrega os dados vinculados
+     * à Empresa Ativa.
      */
     async function load() {
-
         const [
             clientesResult,
             fornecedoresResult,
             categoriasResult,
-            contasResult,
-            empresasResult
-        ] = await Promise.all([
+            contasResult
+        ] =
+            await Promise.all([
+                loadWithFallback(
+                    () =>
+                        api.get<
+                            Pessoa[]
+                        >(
+                            '/api/clientes'
+                        ),
 
-            /*
-             * Carrega os clientes.
-             */
-            loadWithFallback(
-                () => api.get<Pessoa[]>('/api/clientes'),
-                mockClientes
-            ),
+                    mockClientes.filter(
+                        item =>
+                            !empresaAtivaId ||
+                            item.empresaId ===
+                                empresaAtivaId
+                    )
+                ),
 
-            /*
-             * Carrega os fornecedores.
-             */
-            loadWithFallback(
-                () => api.get<Pessoa[]>('/api/fornecedores'),
-                mockFornecedores
-            ),
+                loadWithFallback(
+                    () =>
+                        api.get<
+                            Pessoa[]
+                        >(
+                            '/api/fornecedores'
+                        ),
 
-            /*
-             * O Plano de Contas passa a ser
-             * a única interface de manutenção
-             * das categorias financeiras.
-             *
-             * No backend, /api/plano-contas
-             * utiliza a mesma estrutura da
-             * antiga rota /api/categorias.
-             */
-            loadWithFallback(
-                () => api.get<Categoria[]>('/api/plano-contas'),
-                mockCategorias
-            ),
+                    mockFornecedores.filter(
+                        item =>
+                            !empresaAtivaId ||
+                            item.empresaId ===
+                                empresaAtivaId
+                    )
+                ),
 
-            /*
-             * Carrega as contas financeiras.
-             */
-            loadWithFallback(
-                () =>
-                    api.get<ContaFinanceira[]>(
-                        '/api/contas-financeiras'
-                    ),
-                mockContasFinanceiras
-            ),
+                loadWithFallback(
+                    () =>
+                        api.get<
+                            Categoria[]
+                        >(
+                            '/api/plano-contas'
+                        ),
 
-            /*
-             * Carrega as empresas.
-             */
-            loadWithFallback(
-                () => api.get<Empresa[]>('/api/empresas'),
-                mockEmpresas
-            )
-        ]);
+                    mockCategorias.filter(
+                        item =>
+                            !empresaAtivaId ||
+                            item.empresaId ===
+                                empresaAtivaId
+                    )
+                ),
+
+                loadWithFallback(
+                    () =>
+                        api.get<
+                            ContaFinanceira[]
+                        >(
+                            '/api/contas-financeiras'
+                        ),
+
+                    mockContasFinanceiras.filter(
+                        item =>
+                            !empresaAtivaId ||
+                            item.empresaId ===
+                                empresaAtivaId
+                    )
+                )
+            ]);
 
 
-        /*
-         * Atualiza os estados da página.
-         */
         setClientes(
             clientesResult.data
         );
+
 
         setFornecedores(
             fornecedoresResult.data
         );
 
+
         setCategorias(
             categoriasResult.data
         );
+
 
         setContas(
             contasResult.data
         );
 
-        setEmpresas(
-            empresasResult.data
-        );
 
-
-        /*
-         * Marca a página como demonstrativa
-         * caso alguma consulta tenha utilizado
-         * os mocks.
-         */
         setDemo(
             clientesResult.demo ||
             fornecedoresResult.demo ||
             categoriasResult.demo ||
-            contasResult.demo ||
-            empresasResult.demo
+            contasResult.demo
         );
 
 
         /*
-         * Seleciona automaticamente o primeiro
-         * cliente quando nenhum estiver selecionado.
+         * Mantém a seleção quando possível.
          */
         setSelected(
-            atual =>
-                atual ??
-                clientesResult.data[0] ??
-                null
+            current => {
+                if (
+                    tab ===
+                    'Fornecedores'
+                ) {
+                    return (
+                        fornecedoresResult
+                            .data
+                            .find(
+                                item =>
+                                    item.id ===
+                                    current?.id
+                            )
+                        ??
+                        fornecedoresResult
+                            .data[0]
+                        ??
+                        null
+                    );
+                }
+
+
+                return (
+                    clientesResult
+                        .data
+                        .find(
+                            item =>
+                                item.id ===
+                                current?.id
+                        )
+                    ??
+                    clientesResult
+                        .data[0]
+                    ??
+                    null
+                );
+            }
         );
     }
 
 
     /*
-     * Executa o carregamento quando
-     * a página é aberta.
+     * Executa quando a página abre.
+     *
+     * A página também é remontada pelo App
+     * sempre que a empresa ativa muda.
      */
     useEffect(() => {
-
         void load();
-
     }, []);
 
 
     /*
-     * Define qual lista será utilizada
-     * na tabela de pessoas.
+     * Lista usada em Cliente/Fornecedor.
      */
     const people =
-        tab === 'Fornecedores'
+        tab ===
+        'Fornecedores'
+
             ? fornecedores
+
             : clientes;
 
 
     /*
      * --------------------------------------------------
-     * CLIENTES E FORNECEDORES
+     * CLIENTE / FORNECEDOR
      * --------------------------------------------------
      */
-
-
-    /*
-     * Cadastra Cliente ou Fornecedor.
-     */
     async function createPerson(
-        event: FormEvent<HTMLFormElement>
+        event:
+            FormEvent<
+                HTMLFormElement
+            >
     ) {
-
         event.preventDefault();
+
+
+        if (!empresaAtivaId) {
+            alert(
+                'Cadastre ou selecione uma empresa antes de criar este registro.'
+            );
+
+            return;
+        }
 
 
         const form =
@@ -303,91 +420,90 @@ export default function RegistryPage() {
             );
 
 
-        /*
-         * ATENÇÃO:
-         *
-         * Por enquanto é utilizada a primeira
-         * empresa cadastrada.
-         *
-         * Isso será substituído posteriormente
-         * pela Empresa Ativa Global.
-         */
         const body = {
-
+            /*
+             * Agora usa explicitamente
+             * a empresa selecionada.
+             */
             empresaId:
-                empresas[0]?.id ?? null,
+                empresaAtivaId,
 
             nome:
                 String(
-                    form.get('nome') || ''
+                    form.get(
+                        'nome'
+                    ) || ''
                 ),
 
             cpfCnpj:
                 String(
-                    form.get('cpfCnpj') || ''
+                    form.get(
+                        'cpfCnpj'
+                    ) || ''
                 ),
 
             email:
                 String(
-                    form.get('email') || ''
+                    form.get(
+                        'email'
+                    ) || ''
                 ),
 
             telefone:
                 String(
-                    form.get('telefone') || ''
+                    form.get(
+                        'telefone'
+                    ) || ''
                 ),
 
             endereco:
                 String(
-                    form.get('endereco') || ''
+                    form.get(
+                        'endereco'
+                    ) || ''
                 ),
 
             observacoes:
                 String(
-                    form.get('observacoes') || ''
+                    form.get(
+                        'observacoes'
+                    ) || ''
                 ),
 
-            ativo: true
+            ativo:
+                true
         };
 
 
         try {
-
-            /*
-             * Escolhe o endpoint conforme
-             * a aba utilizada.
-             */
             const endpoint =
-                tab === 'Fornecedores'
+                tab ===
+                'Fornecedores'
+
                     ? '/api/fornecedores'
+
                     : '/api/clientes';
 
 
-            /*
-             * Envia o cadastro.
-             */
             await api.post(
                 endpoint,
                 body
             );
 
 
-            /*
-             * Fecha o modal.
-             */
-            setOpenPessoa(false);
+            setOpenPessoa(
+                false
+            );
 
 
-            /*
-             * Atualiza os dados da tela.
-             */
             await load();
 
         } catch (error) {
-
             alert(
                 error instanceof Error
+
                     ? error.message
+
                     : 'Erro ao salvar cadastro.'
             );
         }
@@ -396,18 +512,15 @@ export default function RegistryPage() {
 
     /*
      * --------------------------------------------------
-     * EMPRESAS
+     * EMPRESA
      * --------------------------------------------------
      */
-
-
-    /*
-     * Cria ou atualiza uma empresa.
-     */
     async function salvarEmpresa(
-        event: FormEvent<HTMLFormElement>
+        event:
+            FormEvent<
+                HTMLFormElement
+            >
     ) {
-
         event.preventDefault();
 
 
@@ -418,85 +531,109 @@ export default function RegistryPage() {
 
 
         const body = {
-
             nome:
                 String(
-                    form.get('nome') || ''
+                    form.get(
+                        'nome'
+                    ) || ''
                 ),
 
             nomeFantasia:
                 String(
-                    form.get('nomeFantasia') || ''
+                    form.get(
+                        'nomeFantasia'
+                    ) || ''
                 ),
 
             cpfCnpj:
                 String(
-                    form.get('cpfCnpj') || ''
+                    form.get(
+                        'cpfCnpj'
+                    ) || ''
                 ),
 
             email:
                 String(
-                    form.get('email') || ''
+                    form.get(
+                        'email'
+                    ) || ''
                 ),
 
             telefone:
                 String(
-                    form.get('telefone') || ''
+                    form.get(
+                        'telefone'
+                    ) || ''
                 ),
 
             endereco:
                 String(
-                    form.get('endereco') || ''
+                    form.get(
+                        'endereco'
+                    ) || ''
                 ),
 
             ativa:
-                empresaEditando?.ativa ??
+                empresaEditando
+                    ?.ativa
+                ??
                 true
         };
 
 
         try {
+            let empresaSalva:
+                Empresa;
 
-            /*
-             * Atualiza uma empresa existente.
-             */
+
             if (empresaEditando) {
-
-                await api.put(
-                    `/api/empresas/${empresaEditando.id}`,
-                    body
-                );
+                empresaSalva =
+                    await api.put<
+                        Empresa
+                    >(
+                        `/api/empresas/${empresaEditando.id}`,
+                        body
+                    );
 
             } else {
-
-                /*
-                 * Cria uma nova empresa.
-                 */
-                await api.post(
-                    '/api/empresas',
-                    body
-                );
+                empresaSalva =
+                    await api.post<
+                        Empresa
+                    >(
+                        '/api/empresas',
+                        body
+                    );
             }
 
 
+            setOpenCadastro(
+                false
+            );
+
+
+            setEmpresaEditando(
+                null
+            );
+
+
             /*
-             * Limpa os estados do modal.
+             * Atualiza a lista global
+             * e seleciona automaticamente
+             * a empresa criada/editada.
              */
-            setOpenCadastro(false);
+            await atualizarEmpresas(
+                empresaSalva.id
+            );
 
-            setEmpresaEditando(null);
 
-
-            /*
-             * Atualiza a tela.
-             */
             await load();
 
         } catch (error) {
-
             alert(
                 error instanceof Error
+
                     ? error.message
+
                     : 'Erro ao salvar empresa.'
             );
         }
@@ -508,24 +645,22 @@ export default function RegistryPage() {
      * PLANO DE CONTAS
      * --------------------------------------------------
      */
-
-
-    /*
-     * Cria ou atualiza uma conta
-     * dentro do Plano de Contas.
-     *
-     * Internamente o backend continua
-     * utilizando a entidade Categoria.
-     *
-     * Dessa forma, cada conta cadastrada
-     * aqui também pode ser utilizada como
-     * categoria em receitas e despesas.
-     */
     async function salvarContaPlano(
-        event: FormEvent<HTMLFormElement>
+        event:
+            FormEvent<
+                HTMLFormElement
+            >
     ) {
-
         event.preventDefault();
+
+
+        if (!empresaAtivaId) {
+            alert(
+                'Selecione uma empresa antes de cadastrar o Plano de Contas.'
+            );
+
+            return;
+        }
 
 
         const form =
@@ -534,103 +669,63 @@ export default function RegistryPage() {
             );
 
 
-        /*
-         * Recupera a conta pai selecionada.
-         */
         const categoriaPai =
             form.get(
                 'categoriaPaiId'
             );
 
 
-        /*
-         * Monta os dados enviados para a API.
-         */
         const body = {
-
-            /*
-             * Temporariamente utiliza
-             * a primeira empresa cadastrada.
-             */
             empresaId:
-                empresas[0]?.id ?? null,
+                empresaAtivaId,
 
-            /*
-             * Nome da conta.
-             *
-             * Exemplos:
-             *
-             * Receitas
-             * Vendas
-             * Serviços
-             * Despesas Administrativas
-             * Energia
-             */
             nome:
                 String(
-                    form.get('nome') || ''
+                    form.get(
+                        'nome'
+                    ) || ''
                 ),
 
-            /*
-             * Define se a conta pertence
-             * ao grupo de Receita ou Despesa.
-             */
             tipo:
                 String(
-                    form.get('tipo') ||
+                    form.get(
+                        'tipo'
+                    ) ||
                     'Despesa'
                 ),
 
-            /*
-             * Permite criar hierarquia.
-             *
-             * Exemplo:
-             *
-             * 2 - Despesas
-             *     2.01 - Administrativas
-             *         2.01.01 - Energia
-             */
             categoriaPaiId:
                 categoriaPai
+
                     ? Number(
                         categoriaPai
                     )
+
                     : null,
 
-            /*
-             * Código contábil/gerencial.
-             */
             codigo:
                 String(
-                    form.get('codigo') || ''
+                    form.get(
+                        'codigo'
+                    ) || ''
                 ),
 
-            /*
-             * Mantém o status atual durante edição.
-             */
             ativa:
-                categoriaEditando?.ativa ??
+                categoriaEditando
+                    ?.ativa
+                ??
                 true
         };
 
 
         try {
-
-            /*
-             * Atualiza uma conta existente.
-             */
             if (categoriaEditando) {
-
                 await api.put(
                     `/api/plano-contas/${categoriaEditando.id}`,
                     body
                 );
 
             } else {
-
-                /*
-                 * Cria uma nova conta.
-                 */
                 await api.post(
                     '/api/plano-contas',
                     body
@@ -638,28 +733,24 @@ export default function RegistryPage() {
             }
 
 
-            /*
-             * Fecha o modal.
-             */
-            setOpenCadastro(false);
+            setOpenCadastro(
+                false
+            );
 
 
-            /*
-             * Limpa o item em edição.
-             */
-            setCategoriaEditando(null);
+            setCategoriaEditando(
+                null
+            );
 
 
-            /*
-             * Atualiza a listagem.
-             */
             await load();
 
         } catch (error) {
-
             alert(
                 error instanceof Error
+
                     ? error.message
+
                     : 'Erro ao salvar conta do Plano de Contas.'
             );
         }
@@ -671,16 +762,22 @@ export default function RegistryPage() {
      * CONTAS FINANCEIRAS
      * --------------------------------------------------
      */
-
-
-    /*
-     * Cria ou atualiza uma conta financeira.
-     */
     async function salvarContaFinanceira(
-        event: FormEvent<HTMLFormElement>
+        event:
+            FormEvent<
+                HTMLFormElement
+            >
     ) {
-
         event.preventDefault();
+
+
+        if (!empresaAtivaId) {
+            alert(
+                'Selecione uma empresa antes de cadastrar uma conta financeira.'
+            );
+
+            return;
+        }
 
 
         const form =
@@ -690,64 +787,67 @@ export default function RegistryPage() {
 
 
         const body = {
-
             empresaId:
-                empresas[0]?.id ?? null,
+                empresaAtivaId,
 
             nome:
                 String(
-                    form.get('nome') || ''
+                    form.get(
+                        'nome'
+                    ) || ''
                 ),
 
             tipo:
                 String(
-                    form.get('tipo') || ''
+                    form.get(
+                        'tipo'
+                    ) || ''
                 ),
 
             instituicao:
                 String(
-                    form.get('instituicao') || ''
+                    form.get(
+                        'instituicao'
+                    ) || ''
                 ),
 
             agencia:
                 String(
-                    form.get('agencia') || ''
+                    form.get(
+                        'agencia'
+                    ) || ''
                 ),
 
             numeroConta:
                 String(
-                    form.get('numeroConta') || ''
+                    form.get(
+                        'numeroConta'
+                    ) || ''
                 ),
 
             saldoInicial:
                 Number(
-                    form.get('saldoInicial') ||
-                    0
+                    form.get(
+                        'saldoInicial'
+                    ) || 0
                 ),
 
             ativa:
-                contaEditando?.ativa ??
+                contaEditando
+                    ?.ativa
+                ??
                 true
         };
 
 
         try {
-
-            /*
-             * Atualiza uma conta existente.
-             */
             if (contaEditando) {
-
                 await api.put(
                     `/api/contas-financeiras/${contaEditando.id}`,
                     body
                 );
 
             } else {
-
-                /*
-                 * Cria uma nova conta financeira.
-                 */
                 await api.post(
                     '/api/contas-financeiras',
                     body
@@ -755,18 +855,24 @@ export default function RegistryPage() {
             }
 
 
-            setOpenCadastro(false);
+            setOpenCadastro(
+                false
+            );
 
-            setContaEditando(null);
+
+            setContaEditando(
+                null
+            );
 
 
             await load();
 
         } catch (error) {
-
             alert(
                 error instanceof Error
+
                     ? error.message
+
                     : 'Erro ao salvar conta financeira.'
             );
         }
@@ -774,127 +880,59 @@ export default function RegistryPage() {
 
 
     /*
-     * --------------------------------------------------
-     * ABERTURA DOS MODAIS
-     * --------------------------------------------------
-     */
-
-
-    /*
-     * Abre o modal para criação
-     * de um novo cadastro.
+     * Abre cadastro vazio.
      */
     function abrirNovoCadastro() {
-
-        setEmpresaEditando(null);
-
-        setCategoriaEditando(null);
-
-        setContaEditando(null);
-
-        setOpenCadastro(true);
-    }
-
-
-    /*
-     * Inicia a edição de uma empresa.
-     */
-    function editarEmpresa(
-        empresa: Empresa
-    ) {
-
         setEmpresaEditando(
-            empresa
+            null
         );
-
-        setOpenCadastro(true);
-    }
-
-
-    /*
-     * Inicia a edição de uma conta
-     * do Plano de Contas.
-     */
-    function editarContaPlano(
-        categoria: Categoria
-    ) {
 
         setCategoriaEditando(
-            categoria
+            null
         );
-
-        setOpenCadastro(true);
-    }
-
-
-    /*
-     * Inicia a edição de uma
-     * conta financeira.
-     */
-    function editarContaFinanceira(
-        conta: ContaFinanceira
-    ) {
 
         setContaEditando(
-            conta
+            null
         );
 
-        setOpenCadastro(true);
+        setOpenCadastro(
+            true
+        );
     }
-
-
-    /*
-     * --------------------------------------------------
-     * FUNÇÕES DO PLANO DE CONTAS
-     * --------------------------------------------------
-     */
 
 
     /*
      * Calcula o nível hierárquico
-     * de uma conta.
-     *
-     * Exemplo:
-     *
-     * Receitas             nível 0
-     *   Vendas             nível 1
-     *     Venda Produto A  nível 2
+     * do Plano de Contas.
      */
     function obterNivelConta(
         conta: Categoria,
-        visitados: Set<number> = new Set()
+
+        visitados:
+            Set<number> =
+                new Set()
     ): number {
-
-        /*
-         * Conta sem pai está no nível raiz.
-         */
-        if (!conta.categoriaPaiId) {
-
+        if (
+            !conta.categoriaPaiId
+        ) {
             return 0;
         }
 
 
-        /*
-         * Evita um possível ciclo acidental
-         * na estrutura do plano.
-         */
-        if (visitados.has(conta.id)) {
-
+        if (
+            visitados.has(
+                conta.id
+            )
+        ) {
             return 0;
         }
 
 
-        /*
-         * Registra a conta como visitada.
-         */
         visitados.add(
             conta.id
         );
 
 
-        /*
-         * Procura a conta pai.
-         */
         const pai =
             categorias.find(
                 item =>
@@ -903,20 +941,11 @@ export default function RegistryPage() {
             );
 
 
-        /*
-         * Caso o pai não exista,
-         * considera a conta como raiz.
-         */
         if (!pai) {
-
             return 0;
         }
 
 
-        /*
-         * Soma um nível e continua
-         * subindo na hierarquia.
-         */
         return (
             1 +
             obterNivelConta(
@@ -928,46 +957,45 @@ export default function RegistryPage() {
 
 
     /*
-     * Organiza o Plano de Contas
-     * pelo código cadastrado.
-     *
-     * O parâmetro numeric permite ordenar:
-     *
-     * 1
-     * 1.01
-     * 1.02
-     * 2
-     * 2.01
+     * Ordena o plano pelo código.
      */
     const planoContasOrdenado =
-        [...categorias].sort(
-            (a, b) =>
-                String(
-                    a.codigo ?? ''
-                ).localeCompare(
-                    String(
-                        b.codigo ?? ''
+        useMemo(
+            () =>
+                [...categorias]
+                    .sort(
+                        (
+                            a,
+                            b
+                        ) =>
+                            String(
+                                a.codigo ??
+                                ''
+                            )
+                                .localeCompare(
+                                    String(
+                                        b.codigo ??
+                                        ''
+                                    ),
+
+                                    'pt-BR',
+
+                                    {
+                                        numeric:
+                                            true
+                                    }
+                                )
                     ),
-                    'pt-BR',
-                    {
-                        numeric: true
-                    }
-                )
+
+            [
+                categorias
+            ]
         );
 
-
-    /*
-     * --------------------------------------------------
-     * INTERFACE
-     * --------------------------------------------------
-     */
 
     return (
         <>
 
-            {/*
-             * Cabeçalho da página.
-             */}
             <div className="page-title">
 
                 <div>
@@ -984,64 +1012,87 @@ export default function RegistryPage() {
 
                     </div>
 
+
                     <p>
-                        Mantenha os dados principais do seu negócio
-                        organizados e atualizados.
+                        Mantenha os dados principais do seu negócio organizados e atualizados.
                     </p>
+
+
+                    {empresaAtiva && (
+
+                        <small>
+                            Empresa ativa:{' '}
+                            {
+                                empresaAtiva.nomeFantasia ||
+                                empresaAtiva.nome
+                            }
+                        </small>
+
+                    )}
 
                 </div>
 
             </div>
 
 
-            {/*
-             * Indicadores gerais.
-             */}
             <div className="kpi-grid four">
 
                 <Kpi
                     icon="user"
                     label="Total de Clientes"
-                    value={String(clientes.length)}
+                    value={
+                        String(
+                            clientes.length
+                        )
+                    }
                     trend="+12,7%"
                 />
+
 
                 <Kpi
                     icon="truck"
                     label="Fornecedores Ativos"
                     value={
                         String(
-                            fornecedores.filter(
-                                item => item.ativo
-                            ).length
+                            fornecedores
+                                .filter(
+                                    item =>
+                                        item.ativo
+                                )
+                                .length
                         )
                     }
                     trend="+8,3%"
                 />
 
+
                 <Kpi
                     icon="tag"
                     label="Contas no Plano"
-                    value={String(categorias.length)}
+                    value={
+                        String(
+                            categorias.length
+                        )
+                    }
                     trend="+0,0%"
                     tone="yellow"
                 />
 
+
                 <Kpi
                     icon="bank"
                     label="Contas Financeiras"
-                    value={String(contas.length)}
+                    value={
+                        String(
+                            contas.length
+                        )
+                    }
                     trend="+0,0%"
                 />
 
             </div>
 
 
-            {/*
-             * Abas disponíveis.
-             *
-             * Categorias foi removida.
-             */}
             <div className="registry-tabs">
 
                 {(
@@ -1057,25 +1108,25 @@ export default function RegistryPage() {
 
                         <button
                             key={item}
+
                             className={
                                 tab === item
+
                                     ? 'active'
+
                                     : ''
                             }
+
                             onClick={() => {
+                                setTab(
+                                    item
+                                );
 
-                                setTab(item);
 
-
-                                /*
-                                 * Atualiza a pessoa selecionada
-                                 * ao alternar Cliente/Fornecedor.
-                                 */
                                 if (
                                     item ===
                                     'Clientes'
                                 ) {
-
                                     setSelected(
                                         clientes[0] ??
                                         null
@@ -1087,7 +1138,6 @@ export default function RegistryPage() {
                                     item ===
                                     'Fornecedores'
                                 ) {
-
                                     setSelected(
                                         fornecedores[0] ??
                                         null
@@ -1095,7 +1145,9 @@ export default function RegistryPage() {
                                 }
                             }}
                         >
+
                             {item}
+
                         </button>
                     )
                 )}
@@ -1103,37 +1155,50 @@ export default function RegistryPage() {
             </div>
 
 
-            {/*
-             * CLIENTES E FORNECEDORES
-             */}
             {(
-                tab === 'Clientes' ||
-                tab === 'Fornecedores'
+                tab ===
+                    'Clientes'
+                ||
+                tab ===
+                    'Fornecedores'
             ) ? (
 
                 <div className="master-detail">
 
-
                     <Card
                         title={tab}
+
                         subtitle={
                             `Gerencie seus ${tab.toLowerCase()} e mantenha as informações atualizadas.`
                         }
+
                         action={
 
                             <Button
                                 icon="plus"
+
                                 onClick={() =>
-                                    setOpenPessoa(true)
+                                    setOpenPessoa(
+                                        true
+                                    )
+                                }
+
+                                disabled={
+                                    !empresaAtivaId
                                 }
                             >
+
                                 Novo{' '}
+
                                 {
                                     tab ===
                                     'Clientes'
+
                                         ? 'Cliente'
+
                                         : 'Fornecedor'
                                 }
+
                             </Button>
                         }
                     >
@@ -1143,6 +1208,7 @@ export default function RegistryPage() {
                             <input
                                 placeholder="Buscar por nome, documento, cidade ou contato..."
                             />
+
 
                             <select>
 
@@ -1194,13 +1260,19 @@ export default function RegistryPage() {
                                         item => (
 
                                             <tr
-                                                key={item.id}
+                                                key={
+                                                    item.id
+                                                }
+
                                                 className={
                                                     selected?.id ===
                                                     item.id
+
                                                         ? 'selected'
+
                                                         : ''
                                                 }
+
                                                 onClick={() =>
                                                     setSelected(
                                                         item
@@ -1238,15 +1310,21 @@ export default function RegistryPage() {
                                                     <Badge
                                                         tone={
                                                             item.ativo
+
                                                                 ? 'success'
+
                                                                 : 'warning'
                                                         }
                                                     >
+
                                                         {
                                                             item.ativo
+
                                                                 ? 'Ativo'
+
                                                                 : 'Inativo'
                                                         }
+
                                                     </Badge>
 
                                                 </td>
@@ -1274,7 +1352,9 @@ export default function RegistryPage() {
                             `Dados do ${
                                 tab ===
                                 'Clientes'
+
                                     ? 'Cliente'
+
                                     : 'Fornecedor'
                             }`
                         }
@@ -1287,7 +1367,9 @@ export default function RegistryPage() {
                                 <Field label="Nome / Razão Social">
 
                                     <input
-                                        value={selected.nome}
+                                        value={
+                                            selected.nome
+                                        }
                                         readOnly
                                     />
 
@@ -1359,15 +1441,6 @@ export default function RegistryPage() {
 
                                 </Field>
 
-
-                                <div className="detail-actions">
-
-                                    <Button>
-                                        Salvar
-                                    </Button>
-
-                                </div>
-
                             </div>
 
                         ) : (
@@ -1382,22 +1455,25 @@ export default function RegistryPage() {
 
             ) : (
 
-                /*
-                 * Exibe Empresa,
-                 * Plano de Contas ou
-                 * Conta Financeira.
-                 */
                 <RegistryOther
 
                     tab={tab}
 
-                    planoContas={planoContasOrdenado}
+                    planoContas={
+                        planoContasOrdenado
+                    }
 
-                    categorias={categorias}
+                    categorias={
+                        categorias
+                    }
 
-                    contas={contas}
+                    contas={
+                        contas
+                    }
 
-                    empresas={empresas}
+                    empresas={
+                        empresas
+                    }
 
                     obterNivelConta={
                         obterNivelConta
@@ -1408,43 +1484,73 @@ export default function RegistryPage() {
                     }
 
                     onEditarEmpresa={
-                        editarEmpresa
+                        empresa => {
+                            setEmpresaEditando(
+                                empresa
+                            );
+
+                            setOpenCadastro(
+                                true
+                            );
+                        }
                     }
 
                     onEditarContaPlano={
-                        editarContaPlano
+                        categoria => {
+                            setCategoriaEditando(
+                                categoria
+                            );
+
+                            setOpenCadastro(
+                                true
+                            );
+                        }
                     }
 
                     onEditarContaFinanceira={
-                        editarContaFinanceira
+                        conta => {
+                            setContaEditando(
+                                conta
+                            );
+
+                            setOpenCadastro(
+                                true
+                            );
+                        }
                     }
                 />
+
             )}
 
 
-            {/*
-             * --------------------------------------------------
-             * MODAL CLIENTE / FORNECEDOR
-             * --------------------------------------------------
-             */}
             <Modal
-                open={openPessoa}
+                open={
+                    openPessoa
+                }
+
                 title={
                     `Novo ${
                         tab ===
                         'Fornecedores'
+
                             ? 'Fornecedor'
+
                             : 'Cliente'
                     }`
                 }
+
                 onClose={() =>
-                    setOpenPessoa(false)
+                    setOpenPessoa(
+                        false
+                    )
                 }
             >
 
                 <form
                     className="form-grid"
-                    onSubmit={createPerson}
+                    onSubmit={
+                        createPerson
+                    }
                 >
 
                     <Field label="Nome / Razão Social">
@@ -1508,16 +1614,25 @@ export default function RegistryPage() {
 
                         <Button
                             variant="secondary"
+
                             onClick={() =>
-                                setOpenPessoa(false)
+                                setOpenPessoa(
+                                    false
+                                )
                             }
                         >
+
                             Cancelar
+
                         </Button>
 
 
-                        <Button type="submit">
+                        <Button
+                            type="submit"
+                        >
+
                             Salvar
+
                         </Button>
 
                     </div>
@@ -1527,32 +1642,37 @@ export default function RegistryPage() {
             </Modal>
 
 
-            {/*
-             * --------------------------------------------------
-             * MODAL EMPRESA
-             * --------------------------------------------------
-             */}
             <Modal
                 open={
                     openCadastro &&
-                    tab === 'Empresas'
+                    tab ===
+                    'Empresas'
                 }
+
                 title={
                     empresaEditando
+
                         ? 'Editar Empresa'
+
                         : 'Nova Empresa'
                 }
+
                 onClose={() => {
+                    setOpenCadastro(
+                        false
+                    );
 
-                    setOpenCadastro(false);
-
-                    setEmpresaEditando(null);
+                    setEmpresaEditando(
+                        null
+                    );
                 }}
             >
 
                 <form
                     className="form-grid"
-                    onSubmit={salvarEmpresa}
+                    onSubmit={
+                        salvarEmpresa
+                    }
                 >
 
                     <Field label="Razão Social">
@@ -1560,8 +1680,11 @@ export default function RegistryPage() {
                         <input
                             name="nome"
                             required
+
                             defaultValue={
-                                empresaEditando?.nome ??
+                                empresaEditando
+                                    ?.nome
+                                ??
                                 ''
                             }
                         />
@@ -1573,8 +1696,11 @@ export default function RegistryPage() {
 
                         <input
                             name="nomeFantasia"
+
                             defaultValue={
-                                empresaEditando?.nomeFantasia ??
+                                empresaEditando
+                                    ?.nomeFantasia
+                                ??
                                 ''
                             }
                         />
@@ -1586,8 +1712,11 @@ export default function RegistryPage() {
 
                         <input
                             name="cpfCnpj"
+
                             defaultValue={
-                                empresaEditando?.cpfCnpj ??
+                                empresaEditando
+                                    ?.cpfCnpj
+                                ??
                                 ''
                             }
                         />
@@ -1600,8 +1729,11 @@ export default function RegistryPage() {
                         <input
                             name="email"
                             type="email"
+
                             defaultValue={
-                                empresaEditando?.email ??
+                                empresaEditando
+                                    ?.email
+                                ??
                                 ''
                             }
                         />
@@ -1613,8 +1745,11 @@ export default function RegistryPage() {
 
                         <input
                             name="telefone"
+
                             defaultValue={
-                                empresaEditando?.telefone ??
+                                empresaEditando
+                                    ?.telefone
+                                ??
                                 ''
                             }
                         />
@@ -1626,8 +1761,11 @@ export default function RegistryPage() {
 
                         <input
                             name="endereco"
+
                             defaultValue={
-                                empresaEditando?.endereco ??
+                                empresaEditando
+                                    ?.endereco
+                                ??
                                 ''
                             }
                         />
@@ -1639,22 +1777,32 @@ export default function RegistryPage() {
 
                         <Button
                             variant="secondary"
+
                             onClick={() => {
+                                setOpenCadastro(
+                                    false
+                                );
 
-                                setOpenCadastro(false);
-
-                                setEmpresaEditando(null);
+                                setEmpresaEditando(
+                                    null
+                                );
                             }}
                         >
+
                             Cancelar
+
                         </Button>
 
 
-                        <Button type="submit">
+                        <Button
+                            type="submit"
+                        >
 
                             {
                                 empresaEditando
+
                                     ? 'Salvar Alterações'
+
                                     : 'Cadastrar Empresa'
                             }
 
@@ -1667,41 +1815,50 @@ export default function RegistryPage() {
             </Modal>
 
 
-            {/*
-             * --------------------------------------------------
-             * MODAL PLANO DE CONTAS
-             * --------------------------------------------------
-             */}
             <Modal
                 open={
                     openCadastro &&
-                    tab === 'Plano de Contas'
+                    tab ===
+                    'Plano de Contas'
                 }
+
                 title={
                     categoriaEditando
+
                         ? 'Editar Conta do Plano'
+
                         : 'Nova Conta do Plano'
                 }
+
                 onClose={() => {
+                    setOpenCadastro(
+                        false
+                    );
 
-                    setOpenCadastro(false);
-
-                    setCategoriaEditando(null);
+                    setCategoriaEditando(
+                        null
+                    );
                 }}
             >
 
                 <form
                     className="form-grid"
-                    onSubmit={salvarContaPlano}
+                    onSubmit={
+                        salvarContaPlano
+                    }
                 >
 
                     <Field label="Código">
 
                         <input
                             name="codigo"
+
                             placeholder="Ex.: 2.01.01"
+
                             defaultValue={
-                                categoriaEditando?.codigo ??
+                                categoriaEditando
+                                    ?.codigo
+                                ??
                                 ''
                             }
                         />
@@ -1713,10 +1870,15 @@ export default function RegistryPage() {
 
                         <input
                             name="nome"
+
                             required
+
                             placeholder="Ex.: Energia Elétrica"
+
                             defaultValue={
-                                categoriaEditando?.nome ??
+                                categoriaEditando
+                                    ?.nome
+                                ??
                                 ''
                             }
                         />
@@ -1728,9 +1890,13 @@ export default function RegistryPage() {
 
                         <select
                             name="tipo"
+
                             required
+
                             defaultValue={
-                                categoriaEditando?.tipo ??
+                                categoriaEditando
+                                    ?.tipo
+                                ??
                                 'Despesa'
                             }
                         >
@@ -1752,9 +1918,11 @@ export default function RegistryPage() {
 
                         <select
                             name="categoriaPaiId"
+
                             defaultValue={
                                 categoriaEditando
-                                    ?.categoriaPaiId ??
+                                    ?.categoriaPaiId
+                                ??
                                 ''
                             }
                         >
@@ -1764,52 +1932,57 @@ export default function RegistryPage() {
                             </option>
 
 
-                            {planoContasOrdenado
+                            {
+                                planoContasOrdenado
 
-                                /*
-                                 * Evita que uma conta
-                                 * seja pai dela mesma.
-                                 */
-                                .filter(
-                                    item =>
-                                        item.id !==
-                                        categoriaEditando?.id
-                                )
+                                    .filter(
+                                        item =>
+                                            item.id !==
+                                            categoriaEditando
+                                                ?.id
+                                    )
 
-                                .map(
-                                    item => {
+                                    .map(
+                                        item => {
+                                            const nivel =
+                                                obterNivelConta(
+                                                    item
+                                                );
 
-                                        const nivel =
-                                            obterNivelConta(
-                                                item
+
+                                            return (
+
+                                                <option
+                                                    key={
+                                                        item.id
+                                                    }
+
+                                                    value={
+                                                        item.id
+                                                    }
+                                                >
+
+                                                    {
+                                                        '— '.repeat(
+                                                            nivel
+                                                        )
+                                                    }
+
+                                                    {
+                                                        item.codigo
+
+                                                            ? `${item.codigo} - `
+
+                                                            : ''
+                                                    }
+
+                                                    {item.nome}
+
+                                                </option>
                                             );
-
-
-                                        return (
-
-                                            <option
-                                                key={item.id}
-                                                value={item.id}
-                                            >
-
-                                                {
-                                                    '— '.repeat(
-                                                        nivel
-                                                    )
-                                                }
-
-                                                {
-                                                    item.codigo
-                                                        ? `${item.codigo} - `
-                                                        : ''
-                                                }
-
-                                                {item.nome}
-
-                                            </option>
-                                        );
-                                    }
-                                )}
+                                        }
+                                    )
+                            }
 
                         </select>
 
@@ -1820,22 +1993,32 @@ export default function RegistryPage() {
 
                         <Button
                             variant="secondary"
+
                             onClick={() => {
+                                setOpenCadastro(
+                                    false
+                                );
 
-                                setOpenCadastro(false);
-
-                                setCategoriaEditando(null);
+                                setCategoriaEditando(
+                                    null
+                                );
                             }}
                         >
+
                             Cancelar
+
                         </Button>
 
 
-                        <Button type="submit">
+                        <Button
+                            type="submit"
+                        >
 
                             {
                                 categoriaEditando
+
                                     ? 'Salvar Alterações'
+
                                     : 'Cadastrar Conta'
                             }
 
@@ -1848,27 +2031,29 @@ export default function RegistryPage() {
             </Modal>
 
 
-            {/*
-             * --------------------------------------------------
-             * MODAL CONTA FINANCEIRA
-             * --------------------------------------------------
-             */}
             <Modal
                 open={
                     openCadastro &&
                     tab ===
                     'Contas Financeiras'
                 }
+
                 title={
                     contaEditando
+
                         ? 'Editar Conta Financeira'
+
                         : 'Nova Conta Financeira'
                 }
+
                 onClose={() => {
+                    setOpenCadastro(
+                        false
+                    );
 
-                    setOpenCadastro(false);
-
-                    setContaEditando(null);
+                    setContaEditando(
+                        null
+                    );
                 }}
             >
 
@@ -1884,9 +2069,13 @@ export default function RegistryPage() {
                         <input
                             name="nome"
                             required
+
                             placeholder="Ex.: Itaú Empresa"
+
                             defaultValue={
-                                contaEditando?.nome ??
+                                contaEditando
+                                    ?.nome
+                                ??
                                 ''
                             }
                         />
@@ -1898,9 +2087,13 @@ export default function RegistryPage() {
 
                         <select
                             name="tipo"
+
                             required
+
                             defaultValue={
-                                contaEditando?.tipo ??
+                                contaEditando
+                                    ?.tipo
+                                ??
                                 'Conta Corrente'
                             }
                         >
@@ -1930,9 +2123,13 @@ export default function RegistryPage() {
 
                         <input
                             name="instituicao"
+
                             placeholder="Ex.: Banco Itaú"
+
                             defaultValue={
-                                contaEditando?.instituicao ??
+                                contaEditando
+                                    ?.instituicao
+                                ??
                                 ''
                             }
                         />
@@ -1944,8 +2141,11 @@ export default function RegistryPage() {
 
                         <input
                             name="agencia"
+
                             defaultValue={
-                                contaEditando?.agencia ??
+                                contaEditando
+                                    ?.agencia
+                                ??
                                 ''
                             }
                         />
@@ -1957,8 +2157,11 @@ export default function RegistryPage() {
 
                         <input
                             name="numeroConta"
+
                             defaultValue={
-                                contaEditando?.numeroConta ??
+                                contaEditando
+                                    ?.numeroConta
+                                ??
                                 ''
                             }
                         />
@@ -1970,10 +2173,15 @@ export default function RegistryPage() {
 
                         <input
                             name="saldoInicial"
+
                             type="number"
+
                             step="0.01"
+
                             defaultValue={
-                                contaEditando?.saldoInicial ??
+                                contaEditando
+                                    ?.saldoInicial
+                                ??
                                 0
                             }
                         />
@@ -1985,22 +2193,32 @@ export default function RegistryPage() {
 
                         <Button
                             variant="secondary"
+
                             onClick={() => {
+                                setOpenCadastro(
+                                    false
+                                );
 
-                                setOpenCadastro(false);
-
-                                setContaEditando(null);
+                                setContaEditando(
+                                    null
+                                );
                             }}
                         >
+
                             Cancelar
+
                         </Button>
 
 
-                        <Button type="submit">
+                        <Button
+                            type="submit"
+                        >
 
                             {
                                 contaEditando
+
                                     ? 'Salvar Alterações'
+
                                     : 'Cadastrar Conta'
                             }
 
@@ -2018,15 +2236,11 @@ export default function RegistryPage() {
 
 
 /*
- * --------------------------------------------------
- * OUTROS CADASTROS
- * --------------------------------------------------
+ * Componente utilizado para:
  *
- * Exibe:
- *
- * - Empresas;
- * - Plano de Contas;
- * - Contas Financeiras.
+ * Empresa
+ * Plano de Contas
+ * Contas Financeiras
  */
 function RegistryOther({
     tab,
@@ -2040,55 +2254,68 @@ function RegistryOther({
     onEditarContaPlano,
     onEditarContaFinanceira
 }: {
+    tab:
+        Tab;
 
-    tab: Tab;
+    planoContas:
+        Categoria[];
 
-    planoContas: Categoria[];
+    categorias:
+        Categoria[];
 
-    categorias: Categoria[];
+    contas:
+        ContaFinanceira[];
 
-    contas: ContaFinanceira[];
+    empresas:
+        Empresa[];
 
-    empresas: Empresa[];
+    obterNivelConta:
+        (
+            conta:
+                Categoria
+        ) => number;
 
-    obterNivelConta: (
-        conta: Categoria
-    ) => number;
+    onNovo:
+        () => void;
 
-    onNovo: () => void;
+    onEditarEmpresa:
+        (
+            empresa:
+                Empresa
+        ) => void;
 
-    onEditarEmpresa: (
-        empresa: Empresa
-    ) => void;
+    onEditarContaPlano:
+        (
+            categoria:
+                Categoria
+        ) => void;
 
-    onEditarContaPlano: (
-        categoria: Categoria
-    ) => void;
-
-    onEditarContaFinanceira: (
-        conta: ContaFinanceira
-    ) => void;
-
+    onEditarContaFinanceira:
+        (
+            conta:
+                ContaFinanceira
+        ) => void;
 }) {
-
-
     /*
-     * --------------------------------------------------
      * EMPRESAS
-     * --------------------------------------------------
      */
-    if (tab === 'Empresas') {
-
+    if (
+        tab ===
+        'Empresas'
+    ) {
         return (
-
             <Card
                 title="Empresas"
-                subtitle="Cadastre e mantenha as empresas utilizadas no PayControl."
-                action={
 
+                subtitle="Cadastre e mantenha as empresas utilizadas no PayControl."
+
+                action={
                     <Button
                         icon="plus"
-                        onClick={onNovo}
+
+                        onClick={
+                            onNovo
+                        }
                     >
                         Nova Empresa
                     </Button>
@@ -2133,7 +2360,11 @@ function RegistryOther({
                             {empresas.map(
                                 empresa => (
 
-                                    <tr key={empresa.id}>
+                                    <tr
+                                        key={
+                                            empresa.id
+                                        }
+                                    >
 
                                         <td>
                                             {empresa.nome}
@@ -2158,15 +2389,21 @@ function RegistryOther({
                                             <Badge
                                                 tone={
                                                     empresa.ativa
+
                                                         ? 'success'
+
                                                         : 'warning'
                                                 }
                                             >
+
                                                 {
                                                     empresa.ativa
+
                                                         ? 'Ativa'
+
                                                         : 'Inativa'
                                                 }
+
                                             </Badge>
 
                                         </td>
@@ -2175,13 +2412,16 @@ function RegistryOther({
 
                                             <Button
                                                 variant="ghost"
+
                                                 onClick={() =>
                                                     onEditarEmpresa(
                                                         empresa
                                                     )
                                                 }
                                             >
+
                                                 Editar
+
                                             </Button>
 
                                         </td>
@@ -2211,25 +2451,25 @@ function RegistryOther({
 
 
     /*
-     * --------------------------------------------------
      * CONTAS FINANCEIRAS
-     * --------------------------------------------------
      */
     if (
         tab ===
         'Contas Financeiras'
     ) {
-
         return (
-
             <Card
                 title="Contas Financeiras"
-                subtitle="Cadastre bancos, caixas, poupanças e outras contas utilizadas pela empresa."
-                action={
 
+                subtitle="Cadastre bancos, caixas, poupanças e outras contas utilizadas pela empresa ativa."
+
+                action={
                     <Button
                         icon="plus"
-                        onClick={onNovo}
+
+                        onClick={
+                            onNovo
+                        }
                     >
                         Nova Conta Financeira
                     </Button>
@@ -2282,7 +2522,11 @@ function RegistryOther({
                             {contas.map(
                                 conta => (
 
-                                    <tr key={conta.id}>
+                                    <tr
+                                        key={
+                                            conta.id
+                                        }
+                                    >
 
                                         <td>
                                             {conta.nome}
@@ -2321,9 +2565,13 @@ function RegistryOther({
                                                 conta.saldoInicial
                                                     .toLocaleString(
                                                         'pt-BR',
+
                                                         {
-                                                            style: 'currency',
-                                                            currency: 'BRL'
+                                                            style:
+                                                                'currency',
+
+                                                            currency:
+                                                                'BRL'
                                                         }
                                                     )
                                             }
@@ -2335,15 +2583,21 @@ function RegistryOther({
                                             <Badge
                                                 tone={
                                                     conta.ativa
+
                                                         ? 'success'
+
                                                         : 'warning'
                                                 }
                                             >
+
                                                 {
                                                     conta.ativa
+
                                                         ? 'Ativa'
+
                                                         : 'Inativa'
                                                 }
+
                                             </Badge>
 
                                         </td>
@@ -2352,13 +2606,16 @@ function RegistryOther({
 
                                             <Button
                                                 variant="ghost"
+
                                                 onClick={() =>
                                                     onEditarContaFinanceira(
                                                         conta
                                                     )
                                                 }
                                             >
+
                                                 Editar
+
                                             </Button>
 
                                         </td>
@@ -2375,7 +2632,7 @@ function RegistryOther({
                     {!contas.length && (
 
                         <EmptyState
-                            text="Nenhuma conta financeira cadastrada."
+                            text="Nenhuma conta financeira cadastrada para a empresa ativa."
                         />
 
                     )}
@@ -2388,21 +2645,21 @@ function RegistryOther({
 
 
     /*
-     * --------------------------------------------------
      * PLANO DE CONTAS
-     * --------------------------------------------------
      */
-
     return (
-
         <Card
             title="Plano de Contas"
-            subtitle="Organize receitas e despesas em uma estrutura hierárquica. As contas cadastradas aqui são utilizadas como categorias dos lançamentos financeiros."
-            action={
 
+            subtitle="Organize receitas e despesas em uma estrutura hierárquica da empresa ativa."
+
+            action={
                 <Button
                     icon="plus"
-                    onClick={onNovo}
+
+                    onClick={
+                        onNovo
+                    }
                 >
                     Nova Conta
                 </Button>
@@ -2450,10 +2707,6 @@ function RegistryOther({
 
                         {planoContas.map(
                             contaPlano => {
-
-                                /*
-                                 * Localiza a conta pai.
-                                 */
                                 const pai =
                                     categorias.find(
                                         item =>
@@ -2462,10 +2715,6 @@ function RegistryOther({
                                     );
 
 
-                                /*
-                                 * Descobre o nível da conta
-                                 * na hierarquia.
-                                 */
                                 const nivel =
                                     obterNivelConta(
                                         contaPlano
@@ -2475,7 +2724,9 @@ function RegistryOther({
                                 return (
 
                                     <tr
-                                        key={contaPlano.id}
+                                        key={
+                                            contaPlano.id
+                                        }
                                     >
 
                                         <td>
@@ -2501,6 +2752,7 @@ function RegistryOther({
                                                     </span>
                                                 )}
 
+
                                                 <strong>
                                                     {
                                                         contaPlano.nome
@@ -2518,13 +2770,17 @@ function RegistryOther({
                                                 tone={
                                                     contaPlano.tipo ===
                                                     'Receita'
+
                                                         ? 'success'
+
                                                         : 'danger'
                                                 }
                                             >
+
                                                 {
                                                     contaPlano.tipo
                                                 }
+
                                             </Badge>
 
                                         </td>
@@ -2534,11 +2790,15 @@ function RegistryOther({
 
                                             {
                                                 pai
+
                                                     ? (
                                                         pai.codigo
+
                                                             ? `${pai.codigo} - ${pai.nome}`
+
                                                             : pai.nome
                                                     )
+
                                                     : 'Conta Raiz'
                                             }
 
@@ -2550,15 +2810,21 @@ function RegistryOther({
                                             <Badge
                                                 tone={
                                                     contaPlano.ativa
+
                                                         ? 'success'
+
                                                         : 'warning'
                                                 }
                                             >
+
                                                 {
                                                     contaPlano.ativa
+
                                                         ? 'Ativa'
+
                                                         : 'Inativa'
                                                 }
+
                                             </Badge>
 
                                         </td>
@@ -2568,13 +2834,16 @@ function RegistryOther({
 
                                             <Button
                                                 variant="ghost"
+
                                                 onClick={() =>
                                                     onEditarContaPlano(
                                                         contaPlano
                                                     )
                                                 }
                                             >
+
                                                 Editar
+
                                             </Button>
 
                                         </td>
@@ -2592,7 +2861,7 @@ function RegistryOther({
                 {!planoContas.length && (
 
                     <EmptyState
-                        text="Nenhuma conta cadastrada no Plano de Contas."
+                        text="Nenhuma conta cadastrada no Plano de Contas da empresa ativa."
                     />
 
                 )}

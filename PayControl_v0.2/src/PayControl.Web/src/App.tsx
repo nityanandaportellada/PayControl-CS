@@ -1,36 +1,304 @@
-// Importa as funções, componentes ou dados utilizados por este módulo.
-import { useEffect, useState } from 'react';
-// Importa as funções, componentes ou dados utilizados por este módulo.
-import { Layout } from './components/Layout';
-// Importa as funções, componentes ou dados utilizados por este módulo.
-import DashboardPage from './pages/DashboardPage';
-// Importa as funções, componentes ou dados utilizados por este módulo.
-import AccountsPayablePage from './pages/AccountsPayablePage';
-// Importa as funções, componentes ou dados utilizados por este módulo.
-import AccountsReceivablePage from './pages/AccountsReceivablePage';
-// Importa as funções, componentes ou dados utilizados por este módulo.
-import CashFlowPage from './pages/CashFlowPage';
-// Importa as funções, componentes ou dados utilizados por este módulo.
-import ReportsPage from './pages/ReportsPage';
-// Importa as funções, componentes ou dados utilizados por este módulo.
-import RegistryPage from './pages/RegistryPage';
-// Importa as funções, componentes ou dados utilizados por este módulo.
-import ReconciliationPage from './pages/ReconciliationPage';
-// Importa as funções, componentes ou dados utilizados por este módulo.
-import BackupsPage from './pages/BackupsPage';
-// Declara o componente/função `normalize`.
-function normalize(p: string) { return p.length > 1 ? p.replace(/\/$/, '') : p; }
-// Declara o componente/função `App`.
+import {
+    useEffect,
+    useState
+} from 'react';
+
+import {
+    Layout
+} from './components/Layout';
+
+import {
+    CompanyProvider,
+    useCompany
+} from './contexts/CompanyContext';
+
+import DashboardPage
+    from './pages/DashboardPage';
+
+import AccountsPayablePage
+    from './pages/AccountsPayablePage';
+
+import AccountsReceivablePage
+    from './pages/AccountsReceivablePage';
+
+import CashFlowPage
+    from './pages/CashFlowPage';
+
+import ReportsPage
+    from './pages/ReportsPage';
+
+import RegistryPage
+    from './pages/RegistryPage';
+
+import ReconciliationPage
+    from './pages/ReconciliationPage';
+
+import BackupsPage
+    from './pages/BackupsPage';
+
+
+/*
+ * Remove a barra final da URL
+ * quando ela não for a raiz.
+ */
+function normalize(
+    path: string
+) {
+    return path.length > 1
+
+        ? path.replace(
+            /\/$/,
+            ''
+        )
+
+        : path;
+}
+
+
+/*
+ * Parte interna da aplicação.
+ *
+ * Este componente já consegue
+ * acessar a Empresa Ativa Global.
+ */
+function AppContent() {
+    /*
+     * Caminho atual.
+     */
+    const [
+        path,
+        setPath
+    ] =
+        useState(
+            () =>
+                normalize(
+                    location.pathname
+                )
+        );
+
+
+    /*
+     * Recupera informações da
+     * empresa global.
+     */
+    const {
+        empresaAtivaId,
+        carregandoEmpresas
+    } =
+        useCompany();
+
+
+    /*
+     * Detecta os botões voltar
+     * e avançar do navegador.
+     */
+    useEffect(() => {
+        const handlePopState =
+            () => {
+                setPath(
+                    normalize(
+                        location.pathname
+                    )
+                );
+            };
+
+
+        addEventListener(
+            'popstate',
+            handlePopState
+        );
+
+
+        return () => {
+            removeEventListener(
+                'popstate',
+                handlePopState
+            );
+        };
+
+    }, []);
+
+
+    /*
+     * Navegação interna do sistema.
+     */
+    function navigate(
+        newPath: string
+    ) {
+        history.pushState(
+            {},
+            '',
+            newPath
+        );
+
+
+        setPath(
+            normalize(
+                newPath
+            )
+        );
+
+
+        scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    }
+
+
+    /*
+     * A chave muda toda vez que
+     * a empresa ativa muda.
+     *
+     * Dessa forma a página atual
+     * é desmontada e carregada novamente.
+     *
+     * Isso faz os useEffect executarem
+     * novas consultas já com empresaId.
+     */
+    const companyKey =
+        empresaAtivaId ??
+        'sem-empresa';
+
+
+    /*
+     * Página que será renderizada.
+     */
+    let page;
+
+
+    /*
+     * Aguarda a inicialização
+     * do contexto de empresas.
+     */
+    if (carregandoEmpresas) {
+        page = (
+            <div className="page-title">
+
+                <div>
+
+                    <h1>
+                        PayControl
+                    </h1>
+
+                    <p>
+                        Carregando empresas...
+                    </p>
+
+                </div>
+
+            </div>
+        );
+
+    } else if (
+        path ===
+        '/contas-pagar'
+    ) {
+        page = (
+            <AccountsPayablePage
+                key={companyKey}
+            />
+        );
+
+    } else if (
+        path ===
+        '/contas-receber'
+    ) {
+        page = (
+            <AccountsReceivablePage
+                key={companyKey}
+            />
+        );
+
+    } else if (
+        path ===
+        '/fluxo-caixa'
+    ) {
+        page = (
+            <CashFlowPage
+                key={companyKey}
+            />
+        );
+
+    } else if (
+        path ===
+        '/relatorios'
+    ) {
+        page = (
+            <ReportsPage
+                key={companyKey}
+            />
+        );
+
+    } else if (
+        path ===
+        '/cadastros'
+    ) {
+        page = (
+            <RegistryPage
+                key={companyKey}
+            />
+        );
+
+    } else if (
+        path ===
+        '/conciliacao'
+    ) {
+        page = (
+            <ReconciliationPage
+                key={companyKey}
+            />
+        );
+
+    } else if (
+        path ===
+        '/backups'
+    ) {
+        /*
+         * Backup pertence à instalação inteira,
+         * e não somente a uma empresa.
+         */
+        page = (
+            <BackupsPage />
+        );
+
+    } else {
+        page = (
+            <DashboardPage
+                key={companyKey}
+                navigate={navigate}
+            />
+        );
+    }
+
+
+    /*
+     * Layout principal.
+     */
+    return (
+        <Layout
+            path={path}
+            navigate={navigate}
+        >
+            {page}
+        </Layout>
+    );
+}
+
+
+/*
+ * Ponto principal da aplicação.
+ *
+ * O CompanyProvider envolve tudo
+ * para disponibilizar empresa ativa
+ * em qualquer tela.
+ */
 export default function App() {
-    // Cria um estado React para manter esta informação enquanto a tela estiver aberta.
-    const [path, setPath] = useState(() => normalize(location.pathname));
-    // Executa este efeito quando o componente é carregado ou quando suas dependências mudam.
-    useEffect(() => { const f = () => setPath(normalize(location.pathname)); addEventListener('popstate', f); return () => removeEventListener('popstate', f); }, []);
-    // Prepara o valor `navigate` usado pela tela.
-    const navigate = (p: string) => { history.pushState({}, '', p); setPath(normalize(p)); scrollTo({ top: 0, behavior: 'smooth' }); };
-    // Prepara o valor `page` usado pela tela.
-    const page = path === '/contas-pagar' ? <AccountsPayablePage /> : path === '/contas-receber' ? <AccountsReceivablePage /> : path === '/fluxo-caixa' ? <CashFlowPage /> : path === '/relatorios' ? <ReportsPage /> : path === '/cadastros' ? <RegistryPage /> : path === '/conciliacao' ? <ReconciliationPage /> : path === '/backups' ? <BackupsPage /> : <DashboardPage navigate={navigate}/>;
-    // Retorna a interface que será renderizada pelo React.
-    return <Layout path={path} navigate={navigate}>{page}
-</Layout>;
+    return (
+        <CompanyProvider>
+
+            <AppContent />
+
+        </CompanyProvider>
+    );
 }
