@@ -97,6 +97,105 @@ public sealed class DatabaseService(IConfiguration configuration)
             {
             }
         }
+
+        /*
+         * ============================================================
+         * MIGRAÇÃO PARA O MODELO MULTIEMPRESA
+         * ============================================================
+         *
+         * Versões anteriores permitiam registros com empresa_id NULL.
+         * Após a implantação da Empresa Ativa Global esses registros
+         * deixam de aparecer nos filtros.
+         *
+         * A estratégia é:
+         *
+         * 1. utilizar a empresa de um cadastro relacionado, quando existir;
+         * 2. caso não seja possível inferir, utilizar a primeira empresa
+         *    cadastrada, que representa a empresa original do banco legado.
+         *
+         * Os UPDATEs são idempotentes: somente registros ainda sem empresa
+         * são modificados.
+         */
+        var empresaPadraoCommand=c.CreateCommand();
+        empresaPadraoCommand.CommandText="SELECT id FROM empresas ORDER BY id LIMIT 1";
+        var empresaPadraoValue=await empresaPadraoCommand.ExecuteScalarAsync();
+
+        if(empresaPadraoValue is not null && empresaPadraoValue is not DBNull)
+        {
+            var empresaPadrao=Convert.ToInt64(empresaPadraoValue);
+
+            async Task MigrarEmpresaAsync(string sql)
+            {
+                var migration=c.CreateCommand();
+                migration.CommandText=sql;
+                migration.Parameters.AddWithValue("$empresa",empresaPadrao);
+                await migration.ExecuteNonQueryAsync();
+            }
+
+            // Cadastros-base antigos.
+            await MigrarEmpresaAsync("UPDATE clientes SET empresa_id=$empresa WHERE empresa_id IS NULL");
+            await MigrarEmpresaAsync("UPDATE fornecedores SET empresa_id=$empresa WHERE empresa_id IS NULL");
+            await MigrarEmpresaAsync("UPDATE categorias SET empresa_id=$empresa WHERE empresa_id IS NULL");
+            await MigrarEmpresaAsync("UPDATE contas_financeiras SET empresa_id=$empresa WHERE empresa_id IS NULL");
+
+            // Contas a pagar: tenta inferir pelos cadastros relacionados.
+            await MigrarEmpresaAsync("""
+                UPDATE contas_pagar
+                SET empresa_id=COALESCE(
+                    (SELECT empresa_id FROM fornecedores WHERE id=contas_pagar.fornecedor_id),
+                    (SELECT empresa_id FROM categorias WHERE id=contas_pagar.categoria_id),
+                    (SELECT empresa_id FROM contas_financeiras WHERE id=contas_pagar.conta_financeira_id),
+                    $empresa
+                )
+                WHERE empresa_id IS NULL;
+                """);
+
+            // Contas a receber: tenta inferir pelos cadastros relacionados.
+            await MigrarEmpresaAsync("""
+                UPDATE contas_receber
+                SET empresa_id=COALESCE(
+                    (SELECT empresa_id FROM clientes WHERE id=contas_receber.cliente_id),
+                    (SELECT empresa_id FROM categorias WHERE id=contas_receber.categoria_id),
+                    (SELECT empresa_id FROM contas_financeiras WHERE id=contas_receber.conta_financeira_id),
+                    $empresa
+                )
+                WHERE empresa_id IS NULL;
+                """);
+
+            // Transferências antigas.
+            await MigrarEmpresaAsync("""
+                UPDATE transferencias
+                SET empresa_id=COALESCE(
+                    (SELECT empresa_id FROM contas_financeiras WHERE id=transferencias.conta_origem_id),
+                    (SELECT empresa_id FROM contas_financeiras WHERE id=transferencias.conta_destino_id),
+                    $empresa
+                )
+                WHERE empresa_id IS NULL;
+                """);
+
+            // Recorrências antigas.
+            await MigrarEmpresaAsync("""
+                UPDATE recorrencias
+                SET empresa_id=COALESCE(
+                    (SELECT empresa_id FROM clientes WHERE id=recorrencias.cliente_id),
+                    (SELECT empresa_id FROM fornecedores WHERE id=recorrencias.fornecedor_id),
+                    (SELECT empresa_id FROM categorias WHERE id=recorrencias.categoria_id),
+                    (SELECT empresa_id FROM contas_financeiras WHERE id=recorrencias.conta_financeira_id),
+                    $empresa
+                )
+                WHERE empresa_id IS NULL;
+                """);
+
+            // Itens de conciliação antigos.
+            await MigrarEmpresaAsync("""
+                UPDATE conciliacao_itens
+                SET empresa_id=COALESCE(
+                    (SELECT empresa_id FROM contas_financeiras WHERE id=conciliacao_itens.conta_financeira_id),
+                    $empresa
+                )
+                WHERE empresa_id IS NULL;
+                """);
+        }
     }
     // Define o método `Date` e sua responsabilidade no fluxo da aplicação.
     public static string Date(DateTime d)=>d.ToString("yyyy-MM-dd",CultureInfo.InvariantCulture);

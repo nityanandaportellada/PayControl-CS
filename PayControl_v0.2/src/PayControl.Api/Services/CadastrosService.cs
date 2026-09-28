@@ -345,12 +345,13 @@ public sealed class CadastrosService(DatabaseService db)
 
     public async Task<Cliente?>
         ObterClienteAsync(
-            long id
+            long id,
+            long? empresaId = null
         )
     {
         return (
             await ListarClientesAsync(
-                null
+                empresaId
             )
         )
         .FirstOrDefault(
@@ -449,12 +450,13 @@ public sealed class CadastrosService(DatabaseService db)
 
     public async Task<Fornecedor?>
         ObterFornecedorAsync(
-            long id
+            long id,
+            long? empresaId = null
         )
     {
         return (
             await ListarFornecedoresAsync(
-                null
+                empresaId
             )
         )
         .FirstOrDefault(
@@ -711,6 +713,51 @@ public sealed class CadastrosService(DatabaseService db)
 
         await connection.OpenAsync();
 
+        /*
+         * Um Cliente/Fornecedor existente não pode ser movido
+         * entre empresas. Isso preserva todos os vínculos históricos
+         * do cadastro com contas a pagar/receber e recorrências.
+         */
+        var empresaAtualCommand =
+            connection.CreateCommand();
+
+        empresaAtualCommand.CommandText =
+            $"SELECT empresa_id FROM {table} WHERE id = $id";
+
+        P(
+            empresaAtualCommand,
+            "$id",
+            id
+        );
+
+        var empresaAtualValue =
+            await empresaAtualCommand.ExecuteScalarAsync();
+
+        if (empresaAtualValue is null)
+        {
+            throw new KeyNotFoundException(
+                "Cadastro não encontrado."
+            );
+        }
+
+        var empresaAtual =
+            empresaAtualValue is DBNull
+                ? null
+                : Convert.ToInt64(
+                    empresaAtualValue
+                );
+
+        if (
+            empresaAtual
+            !=
+            request.EmpresaId
+        )
+        {
+            throw new ArgumentException(
+                "Um cadastro existente não pode ser transferido para outra empresa."
+            );
+        }
+
         var command =
             connection.CreateCommand();
 
@@ -926,12 +973,13 @@ public sealed class CadastrosService(DatabaseService db)
 
     public async Task<Categoria?>
         ObterCategoriaAsync(
-            long id
+            long id,
+            long? empresaId = null
         )
     {
         return (
             await ListarCategoriasAsync(
-                null,
+                empresaId,
                 null
             )
         )
@@ -1262,12 +1310,13 @@ public sealed class CadastrosService(DatabaseService db)
 
     public async Task<ContaFinanceira?>
         ObterContaFinanceiraAsync(
-            long id
+            long id,
+            long? empresaId = null
         )
     {
         return (
             await ListarContasFinanceirasAsync(
-                null
+                empresaId
             )
         )
         .FirstOrDefault(
@@ -1406,6 +1455,17 @@ public sealed class CadastrosService(DatabaseService db)
                 "Conta financeira não encontrada."
             );
 
+        if (
+            request.EmpresaId
+            !=
+            atual.EmpresaId
+        )
+        {
+            throw new ArgumentException(
+                "Uma conta financeira existente não pode ser transferida para outra empresa."
+            );
+        }
+
         await ValidarEmpresaAsync(
             atual.EmpresaId
         );
@@ -1537,9 +1597,20 @@ public sealed class CadastrosService(DatabaseService db)
     public async Task ExcluirCadastroAsync(
         string table,
         string entidade,
-        long id
+        long id,
+        long? empresaId = null
     )
     {
+        if (empresaId.HasValue)
+        {
+            await ValidarCadastroDaEmpresaAsync(
+                table,
+                entidade,
+                id,
+                empresaId.Value
+            );
+        }
+
         switch (table)
         {
             case "clientes":
@@ -1611,6 +1682,55 @@ public sealed class CadastrosService(DatabaseService db)
         {
             throw new KeyNotFoundException(
                 $"{entidade} não encontrado."
+            );
+        }
+    }
+
+
+    /*
+     * Confirma que um cadastro acessado por ID pertence
+     * à empresa ativa. É utilizado principalmente nas exclusões.
+     */
+    private async Task ValidarCadastroDaEmpresaAsync(
+        string table,
+        string entidade,
+        long id,
+        long empresaId
+    )
+    {
+        await using var connection =
+            db.CreateConnection();
+
+        await connection.OpenAsync();
+
+        var command =
+            connection.CreateCommand();
+
+        command.CommandText =
+            $"SELECT COUNT(*) FROM {table} WHERE id = $id AND empresa_id = $empresa;";
+
+        P(
+            command,
+            "$id",
+            id
+        );
+
+        P(
+            command,
+            "$empresa",
+            empresaId
+        );
+
+        if (
+            Convert.ToInt32(
+                await command.ExecuteScalarAsync()
+            )
+            ==
+            0
+        )
+        {
+            throw new KeyNotFoundException(
+                $"{entidade} não encontrado para a empresa ativa."
             );
         }
     }
@@ -1743,9 +1863,179 @@ public sealed class CadastrosService(DatabaseService db)
 
 
         /*
-         * Conta raiz não possui pai.
+         * --------------------------------------------------------
+         * CONSISTÊNCIA DOS FILHOS E DO HISTÓRICO
+         * --------------------------------------------------------
+         *
+         * Ao editar uma conta existente, ela não pode ser movida
+         * para outra empresa. Também não permitimos alterar seu tipo
+         * quando isso tornaria contas filhas ou lançamentos históricos
+         * incompatíveis.
          */
+        if (idAtual.HasValue)
+        {
+            var atualCommand =
+                connection.CreateCommand();
 
+            atualCommand.CommandText = "SELECT empresa_id FROM categorias WHERE id = $id";
+
+            P(
+                atualCommand,
+                "$id",
+                idAtual.Value
+            );
+
+            var empresaAtualValue =
+                await atualCommand.ExecuteScalarAsync();
+
+            var empresaAtual =
+                empresaAtualValue is null or DBNull
+                    ? null
+                    : Convert.ToInt64(
+                        empresaAtualValue
+                    );
+
+            if (
+                empresaAtual
+                !=
+                request.EmpresaId
+            )
+            {
+                throw new ArgumentException(
+                    "Uma conta existente do Plano de Contas não pode ser transferida para outra empresa."
+                );
+            }
+
+            var filhosIncompativeis =
+                connection.CreateCommand();
+
+            filhosIncompativeis.CommandText = """
+                SELECT COUNT(*)
+                FROM categorias
+                WHERE categoria_pai_id = $id
+                  AND (
+                        empresa_id <> $empresa
+                        OR lower(tipo) <> lower($tipo)
+                      );
+                """;
+
+            P(
+                filhosIncompativeis,
+                "$id",
+                idAtual.Value
+            );
+
+            P(
+                filhosIncompativeis,
+                "$empresa",
+                request.EmpresaId
+            );
+
+            P(
+                filhosIncompativeis,
+                "$tipo",
+                tipo
+            );
+
+            if (
+                Convert.ToInt32(
+                    await filhosIncompativeis
+                        .ExecuteScalarAsync()
+                )
+                >
+                0
+            )
+            {
+                throw new InvalidOperationException(
+                    "Não é possível alterar o tipo desta conta porque existem contas filhas com tipo incompatível."
+                );
+            }
+
+            /*
+             * Uma conta pai não pode ser inativada enquanto
+             * ainda possuir contas filhas ativas.
+             */
+            if (!request.Ativa)
+            {
+                var filhosAtivos =
+                    connection.CreateCommand();
+
+                filhosAtivos.CommandText = """
+                    SELECT COUNT(*)
+                    FROM categorias
+                    WHERE categoria_pai_id = $id
+                      AND ativa = 1;
+                    """;
+
+                P(
+                    filhosAtivos,
+                    "$id",
+                    idAtual.Value
+                );
+
+                if (
+                    Convert.ToInt32(
+                        await filhosAtivos
+                            .ExecuteScalarAsync()
+                    )
+                    >
+                    0
+                )
+                {
+                    throw new InvalidOperationException(
+                        "Não é possível inativar esta conta enquanto existirem contas filhas ativas."
+                    );
+                }
+            }
+
+            var usoIncompativel =
+                connection.CreateCommand();
+
+            usoIncompativel.CommandText = tipo.Equals(
+                "Receita",
+                StringComparison.OrdinalIgnoreCase
+            )
+                ? """
+                    SELECT
+                        (SELECT COUNT(*) FROM contas_pagar WHERE categoria_id = $id)
+                        +
+                        (SELECT COUNT(*) FROM recorrencias WHERE categoria_id = $id AND lower(natureza) = 'pagar');
+                    """
+                : """
+                    SELECT
+                        (SELECT COUNT(*) FROM contas_receber WHERE categoria_id = $id)
+                        +
+                        (SELECT COUNT(*) FROM recorrencias WHERE categoria_id = $id AND lower(natureza) = 'receber');
+                    """;
+
+            P(
+                usoIncompativel,
+                "$id",
+                idAtual.Value
+            );
+
+            if (
+                Convert.ToInt32(
+                    await usoIncompativel
+                        .ExecuteScalarAsync()
+                )
+                >
+                0
+            )
+            {
+                throw new InvalidOperationException(
+                    "Não é possível alterar o tipo desta conta porque ela já possui lançamentos financeiros incompatíveis."
+                );
+            }
+        }
+
+
+        /*
+         * Conta raiz não possui pai.
+         *
+         * A validação dos filhos acima precisa acontecer antes
+         * deste retorno, inclusive para contas raiz.
+         */
         if (
             !request
                 .CategoriaPaiId
@@ -1788,7 +2078,8 @@ public sealed class CadastrosService(DatabaseService db)
             SELECT
                 empresa_id,
                 tipo,
-                categoria_pai_id
+                categoria_pai_id,
+                ativa
 
             FROM categorias
 
@@ -1826,6 +2117,20 @@ public sealed class CadastrosService(DatabaseService db)
         var tipoPai =
             paiReader
                 .GetString(1);
+
+        var paiAtivo =
+            paiReader
+                .GetInt64(3)
+            ==
+            1;
+
+
+        if (!paiAtivo)
+        {
+            throw new ArgumentException(
+                "A conta pai informada está inativa. Reative-a antes de utilizá-la na hierarquia."
+            );
+        }
 
 
         /*

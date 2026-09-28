@@ -95,6 +95,12 @@ public sealed class ConciliacaoService(DatabaseService db)
     // Define o método `ImportarCsvAsync` e sua responsabilidade no fluxo da aplicação.
     public async Task<int> ImportarCsvAsync(long? empresa,long conta,IFormFile file)
     {
+        /*
+         * A conta utilizada na conciliação precisa pertencer
+         * à mesma empresa selecionada no PayControl.
+         */
+        var empresaValidada=await ValidarEmpresaEContaAsync(empresa,conta);
+
         // Importa os recursos do namespace `var sr=new StreamReader(file.OpenReadStream(),Encoding.UTF8,true)` usados neste arquivo.
         using var sr=new StreamReader(file.OpenReadStream(),Encoding.UTF8,true);
         // Prepara o valor de `header` que será usado nas próximas etapas do processamento.
@@ -125,7 +131,7 @@ public sealed class ConciliacaoService(DatabaseService db)
             var q=c.CreateCommand();
             // Define o comando SQL que será executado no banco SQLite.
             q.CommandText="INSERT INTO conciliacao_itens(empresa_id,conta_financeira_id,data,descricao,valor,tipo,documento,status,importado_em) VALUES($e,$c,$d,$ds,$v,$t,$doc,'Pendente',$i)";
-            CadastrosService.P(q,"$e",empresa);
+            CadastrosService.P(q,"$e",empresaValidada);
             CadastrosService.P(q,"$c",conta);
             CadastrosService.P(q,"$d",DatabaseService.Date(data));
             CadastrosService.P(q,"$ds",p[1]);
@@ -143,6 +149,12 @@ public sealed class ConciliacaoService(DatabaseService db)
     // Define o método `ImportarOfxAsync` e sua responsabilidade no fluxo da aplicação.
     public async Task<int> ImportarOfxAsync(long? empresa,long conta,IFormFile file)
     {
+        /*
+         * Repete a validação também para OFX para impedir
+         * a associação de extrato bancário entre empresas.
+         */
+        var empresaValidada=await ValidarEmpresaEContaAsync(empresa,conta);
+
         // Importa os recursos do namespace `var sr=new StreamReader(file.OpenReadStream(),Encoding.UTF8,true)` usados neste arquivo.
         using var sr=new StreamReader(file.OpenReadStream(),Encoding.UTF8,true);
         // Prepara o valor de `txt` que será usado nas próximas etapas do processamento.
@@ -185,7 +197,7 @@ public sealed class ConciliacaoService(DatabaseService db)
             var q=c.CreateCommand();
             // Define o comando SQL que será executado no banco SQLite.
             q.CommandText="INSERT INTO conciliacao_itens(empresa_id,conta_financeira_id,data,descricao,valor,tipo,documento,status,importado_em) VALUES($e,$c,$d,$ds,$v,$t,$doc,'Pendente',$i)";
-            CadastrosService.P(q,"$e",empresa);
+            CadastrosService.P(q,"$e",empresaValidada);
             CadastrosService.P(q,"$c",conta);
             CadastrosService.P(q,"$d",DatabaseService.Date(data));
             CadastrosService.P(q,"$ds",desc);
@@ -226,20 +238,81 @@ public sealed class ConciliacaoService(DatabaseService db)
     // Define o método `VincularAsync` e sua responsabilidade no fluxo da aplicação.
     public async Task VincularAsync(long item,string entidade,long lancamento)
     {
-        // Prepara o valor de `col` que será usado nas próximas etapas do processamento.
-        var col=entidade.Equals("Pagar",StringComparison.OrdinalIgnoreCase)?"conta_pagar_id":entidade.Equals("Receber",StringComparison.OrdinalIgnoreCase)?"conta_receber_id":throw new ArgumentException("Entidade deve ser Pagar ou Receber.");
-        // Cria uma conexão com o banco de dados usando a configuração central do sistema.
+        var isPagar=entidade.Equals("Pagar",StringComparison.OrdinalIgnoreCase);
+        var isReceber=entidade.Equals("Receber",StringComparison.OrdinalIgnoreCase);
+
+        if(!isPagar&&!isReceber)
+            throw new ArgumentException("Entidade deve ser Pagar ou Receber.");
+
+        var col=isPagar?"conta_pagar_id":"conta_receber_id";
+        var tabela=isPagar?"contas_pagar":"contas_receber";
+
         await using var c=db.CreateConnection();
-        // Abre a conexão com o banco antes de executar comandos SQL.
         await c.OpenAsync();
-        // Prepara o valor de `q` que será usado nas próximas etapas do processamento.
+
+        /*
+         * Recupera a empresa do item importado.
+         */
+        var itemCommand=c.CreateCommand();
+        itemCommand.CommandText="SELECT empresa_id FROM conciliacao_itens WHERE id=$id";
+        CadastrosService.P(itemCommand,"$id",item);
+
+        var empresaValue=await itemCommand.ExecuteScalarAsync();
+
+        if(empresaValue is null||empresaValue is DBNull)
+            throw new KeyNotFoundException("Item de conciliação não encontrado ou sem empresa vinculada.");
+
+        var empresaId=Convert.ToInt64(empresaValue);
+
+        /*
+         * O lançamento escolhido precisa pertencer à mesma
+         * empresa do extrato que está sendo conciliado.
+         */
+        var lancamentoCommand=c.CreateCommand();
+        lancamentoCommand.CommandText=$"SELECT COUNT(*) FROM {tabela} WHERE id=$id AND empresa_id=$empresa";
+        CadastrosService.P(lancamentoCommand,"$id",lancamento);
+        CadastrosService.P(lancamentoCommand,"$empresa",empresaId);
+
+        if(Convert.ToInt32(await lancamentoCommand.ExecuteScalarAsync())==0)
+            throw new InvalidOperationException("O lançamento selecionado não pertence à mesma empresa do item de conciliação.");
+
         var q=c.CreateCommand();
-        // Define o comando SQL que será executado no banco SQLite.
         q.CommandText=$"UPDATE conciliacao_itens SET status='Conciliado',{col}=$l WHERE id=$id";
         CadastrosService.P(q,"$l",lancamento);
         CadastrosService.P(q,"$id",item);
-        // Verifica a condição antes de continuar, evitando que o sistema processe um estado inválido.
-        if(await q.ExecuteNonQueryAsync()==0)throw new KeyNotFoundException();
+
+        if(await q.ExecuteNonQueryAsync()==0)
+            throw new KeyNotFoundException("Item de conciliação não encontrado.");
+    }
+
+    /*
+     * Garante que a conta financeira escolhida pertença
+     * à empresa ativa antes de importar um extrato.
+     */
+    private async Task<long> ValidarEmpresaEContaAsync(long? empresa,long conta)
+    {
+        if(!empresa.HasValue)
+            throw new ArgumentException("Empresa é obrigatória para importar a conciliação.");
+
+        await using var c=db.CreateConnection();
+        await c.OpenAsync();
+
+        var q=c.CreateCommand();
+        q.CommandText="""
+            SELECT COUNT(*)
+            FROM contas_financeiras
+            WHERE id=$conta
+              AND empresa_id=$empresa
+              AND ativa=1;
+            """;
+
+        CadastrosService.P(q,"$conta",conta);
+        CadastrosService.P(q,"$empresa",empresa.Value);
+
+        if(Convert.ToInt32(await q.ExecuteScalarAsync())==0)
+            throw new InvalidOperationException("A conta financeira selecionada não pertence à empresa ativa ou está inativa.");
+
+        return empresa.Value;
     }
 }
 // Declara `BackupService`, que representa uma parte do domínio do PayControl.

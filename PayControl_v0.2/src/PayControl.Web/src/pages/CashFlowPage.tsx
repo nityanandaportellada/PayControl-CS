@@ -18,12 +18,12 @@ import {
 } from '../contexts/CompanyContext';
 
 import {
-    mockAlerts,
     mockContasFinanceiras,
     mockFluxo
 } from '../mock';
 
 import type {
+    AlertItem,
     ContaFinanceira,
     Fluxo,
     Transferencia
@@ -95,6 +95,17 @@ export default function CashFlowPage() {
 
 
     const [
+        alertas,
+        setAlertas
+    ] =
+        useState<
+            AlertItem[]
+        >(
+            []
+        );
+
+
+    const [
         demo,
         setDemo
     ] =
@@ -148,7 +159,8 @@ export default function CashFlowPage() {
         const [
             fluxoResult,
             contasResult,
-            transferenciasResult
+            transferenciasResult,
+            alertasResult
         ] =
             await Promise.all([
                 loadWithFallback(
@@ -193,6 +205,17 @@ export default function CashFlowPage() {
                         ),
 
                     [] as Transferencia[]
+                ),
+
+                loadWithFallback(
+                    () =>
+                        api.get<
+                            AlertItem[]
+                        >(
+                            '/api/dashboard/alertas'
+                        ),
+
+                    [] as AlertItem[]
                 )
             ]);
 
@@ -217,12 +240,19 @@ export default function CashFlowPage() {
         );
 
 
+        setAlertas(
+            alertasResult.data
+        );
+
+
         setDemo(
             fluxoResult.demo
             ||
             contasResult.demo
             ||
             transferenciasResult.demo
+            ||
+            alertasResult.demo
         );
     }
 
@@ -1170,7 +1200,7 @@ export default function CashFlowPage() {
                 <div className="alert-list">
 
                     {
-                        mockAlerts.map(
+                        alertas.map(
                             (
                                 alerta,
                                 index
@@ -1202,6 +1232,15 @@ export default function CashFlowPage() {
 
                             )
                         )
+                    }
+
+
+                    {
+                        !alertas.length
+                        &&
+                        <EmptyState
+                            text="Nenhum alerta financeiro para a empresa ativa."
+                        />
                     }
 
                 </div>

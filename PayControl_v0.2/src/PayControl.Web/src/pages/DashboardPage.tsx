@@ -3,9 +3,9 @@ import { useEffect, useMemo, useState } from 'react';
 // Importa as funções, componentes ou dados utilizados por este módulo.
 import { api, loadWithFallback } from '../api';
 // Importa as funções, componentes ou dados utilizados por este módulo.
-import { mockAlerts, mockContasPagar, mockFluxo, mockReceitas } from '../mock';
+import { mockContasPagar, mockFluxo, mockReceitas } from '../mock';
 // Importa apenas os tipos TypeScript usados para validar os dados em tempo de desenvolvimento.
-import type { ContaPagar, Fluxo, Receita } from '../types';
+import type { AlertItem, ContaPagar, Fluxo, Receita } from '../types';
 // Importa as funções, componentes ou dados utilizados por este módulo.
 import { Bars, Card, DemoPill, Donut, Kpi, LineChart, Badge, money, statusTone } from '../components/UI';
 // Declara o componente/função `DashboardPage`.
@@ -19,13 +19,16 @@ export default function DashboardPage({ navigate }: {
     // Cria um estado React para manter esta informação enquanto a tela estiver aberta.
     const [receber, setReceber] = useState<Receita[]>(mockReceitas);
     // Cria um estado React para manter esta informação enquanto a tela estiver aberta.
+    const [alertas, setAlertas] = useState<AlertItem[]>([]);
+    // Cria um estado React para manter esta informação enquanto a tela estiver aberta.
     const [demo, setDemo] = useState(false);
     // Executa este efeito quando o componente é carregado ou quando suas dependências mudam.
-        useEffect(() => { void (async () => { const [f, p, r] = await Promise.all([loadWithFallback(() => api.get<Fluxo>('/api/fluxo-financeiro'), mockFluxo), loadWithFallback(() => api.get<ContaPagar[]>('/api/contas-pagar'), mockContasPagar), loadWithFallback(() => api.get<Receita[]>('/api/contas-receber'), mockReceitas)]);
+        useEffect(() => { void (async () => { const [f, p, r, a] = await Promise.all([loadWithFallback(() => api.get<Fluxo>('/api/fluxo-financeiro'), mockFluxo), loadWithFallback(() => api.get<ContaPagar[]>('/api/contas-pagar'), mockContasPagar), loadWithFallback(() => api.get<Receita[]>('/api/contas-receber'), mockReceitas), loadWithFallback(() => api.get<AlertItem[]>('/api/dashboard/alertas'), [] as AlertItem[])]);
     setFluxo(f.data);
     setPagar(p.data);
     setReceber(r.data);
-    setDemo(f.demo || p.demo || r.demo);
+    setAlertas(a.data);
+    setDemo(f.demo || p.demo || r.demo || a.demo);
     })();
     }, []);
     // Prepara o valor `received` usado pela tela.
@@ -97,12 +100,13 @@ export default function DashboardPage({ navigate }: {
                 </Card>
                 {/* Painel visual que agrupa informações relacionadas. */}
                 <Card title="Alertas" action={<button className="link-button">Ver todos</button>}>
-                    <div className="alert-list">{mockAlerts.map((a, i) => <button className={`alert alert-${a.level}`} key={i}>
+                    <div className="alert-list">{alertas.map((a, i) => <button className={`alert alert-${a.level}`} key={i}>
                         <strong>{a.title}
                         </strong>
                         <span>{a.detail}
                         </span>
                     </button>)}
+                    {!alertas.length && <div className="empty-state">Nenhum alerta financeiro para a empresa ativa.</div>}
                 </div>
             </Card>
             {/* Painel visual que agrupa informações relacionadas. */}

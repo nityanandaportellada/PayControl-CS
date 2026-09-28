@@ -98,7 +98,39 @@ export function CompanyProvider({
         setEmpresaAtivaId
     ] =
         useState<number | null>(
-            null
+            () => {
+                /*
+                 * Recupera a empresa salva já na criação
+                 * do estado. Isso evita que o primeiro
+                 * useEffect apague a seleção durante o F5.
+                 */
+                const valorSalvo =
+                    localStorage.getItem(
+                        STORAGE_KEY
+                    );
+
+
+                if (!valorSalvo) {
+                    return null;
+                }
+
+
+                const idSalvo =
+                    Number(
+                        valorSalvo
+                    );
+
+
+                return (
+                    Number.isFinite(
+                        idSalvo
+                    )
+                    &&
+                    idSalvo > 0
+                )
+                    ? idSalvo
+                    : null;
+            }
         );
 
 
@@ -278,6 +310,16 @@ export function CompanyProvider({
      * com a empresa ativa.
      */
     useEffect(() => {
+        /*
+         * Enquanto a lista inicial ainda está sendo
+         * carregada, não alteramos o localStorage.
+         * Dessa forma um F5 não apaga a empresa salva.
+         */
+        if (carregandoEmpresas) {
+            return;
+        }
+
+
         setApiEmpresaId(
             empresaAtivaId
         );
@@ -296,7 +338,7 @@ export function CompanyProvider({
             );
         }
 
-    }, [empresaAtivaId]);
+    }, [empresaAtivaId, carregandoEmpresas]);
 
 
     /*

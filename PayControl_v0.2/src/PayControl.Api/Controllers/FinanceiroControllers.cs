@@ -17,7 +17,7 @@ public sealed class ContasPagarController(FinanceiroService s) : ControllerBase
     public async Task<IActionResult>L(long? empresaId,string? status,long? fornecedorId,long? categoriaId,long? contaFinanceiraId,DateTime? inicio,DateTime? fim,string? busca)=>Ok(await s.ListarContasPagarAsync(empresaId,status,fornecedorId,categoriaId,contaFinanceiraId,inicio,fim,busca));
     // Aplica este atributo para configurar o comportamento do elemento abaixo.
     [HttpGet("{id:long}")]
-    public async Task<IActionResult>O(long id)=>(await s.ObterContaPagarAsync(id)) is
+    public async Task<IActionResult>O(long id,long empresaId)=>(await s.ObterContaPagarAsync(id,empresaId)) is
     {
     }
     x?Ok(x):NotFound();
@@ -26,28 +26,28 @@ public sealed class ContasPagarController(FinanceiroService s) : ControllerBase
     public async Task<IActionResult>C(CriarContaPagarRequest r)=>StatusCode(201,await s.CriarContasPagarAsync(r));
     // Aplica este atributo para configurar o comportamento do elemento abaixo.
     [HttpPatch("{id:long}")]
-    public async Task<IActionResult>U(long id,AtualizarContaPagarRequest r)=>Ok(await s.AtualizarContaPagarAsync(id,r));
+    public async Task<IActionResult>U(long id,long empresaId,AtualizarContaPagarRequest r)=>Ok(await s.AtualizarContaPagarAsync(id,r,empresaId));
     // Aplica este atributo para configurar o comportamento do elemento abaixo.
     [HttpPost("{id:long}/pagar")]
-    public async Task<IActionResult>P(long id,LiquidarRequest? r)=>Ok(await s.PagarAsync(id,r??new(null,null,null)));
+    public async Task<IActionResult>P(long id,long empresaId,LiquidarRequest? r)=>Ok(await s.PagarAsync(id,r??new(null,null,null),empresaId));
     // Aplica este atributo para configurar o comportamento do elemento abaixo.
     [HttpPost("{id:long}/estornar")]
-    public async Task<IActionResult>E(long id,CancelarRequest? r)=>Ok(await s.EstornarPagamentoAsync(id,r?.Motivo));
+    public async Task<IActionResult>E(long id,long empresaId,CancelarRequest? r)=>Ok(await s.EstornarPagamentoAsync(id,r?.Motivo,empresaId));
     // Aplica este atributo para configurar o comportamento do elemento abaixo.
     [HttpPost("{id:long}/cancelar")]
-    public async Task<IActionResult>X(long id,CancelarRequest? r)=>Ok(await s.CancelarContaAsync(id,r?.Motivo));
+    public async Task<IActionResult>X(long id,long empresaId,CancelarRequest? r)=>Ok(await s.CancelarContaAsync(id,r?.Motivo,empresaId));
     // Aplica este atributo para configurar o comportamento do elemento abaixo.
     [HttpDelete("{id:long}")]
-    public async Task<IActionResult>D(long id)
+    public async Task<IActionResult>D(long id,long empresaId)
     {
         // Aguarda a conclusão da operação assíncrona antes de seguir para o próximo passo.
-        await s.ExcluirContaAsync(id);
+        await s.ExcluirContaAsync(id,empresaId);
         // Retorna o resultado calculado para quem chamou este método.
         return NoContent();
     }
     // Aplica este atributo para configurar o comportamento do elemento abaixo.
     [HttpGet("{id:long}/eventos")]
-    public async Task<IActionResult>Ev(long id)=>Ok(await s.EventosAsync("ContaPagar",id));
+    public async Task<IActionResult>Ev(long id,long empresaId)=>Ok(await s.EventosAsync("ContaPagar",id,empresaId));
 }
 // Declara `ReceitasController`, que representa uma parte do domínio do PayControl.
 [ApiController]
@@ -60,7 +60,7 @@ public sealed class ReceitasController(FinanceiroService s) : ControllerBase
     public async Task<IActionResult>L(long? empresaId,string? status,string? tipo,long? clienteId,long? categoriaId,long? contaFinanceiraId,DateTime? inicio,DateTime? fim,string? busca)=>Ok(await s.ListarReceitasAsync(empresaId,status,tipo,clienteId,categoriaId,contaFinanceiraId,inicio,fim,busca));
     // Aplica este atributo para configurar o comportamento do elemento abaixo.
     [HttpGet("{id:long}")]
-    public async Task<IActionResult>O(long id)=>(await s.ObterReceitaAsync(id)) is
+    public async Task<IActionResult>O(long id,long empresaId)=>(await s.ObterReceitaAsync(id,empresaId)) is
     {
     }
     x?Ok(x):NotFound();
@@ -69,28 +69,28 @@ public sealed class ReceitasController(FinanceiroService s) : ControllerBase
     public async Task<IActionResult>C(CriarReceitaRequest r)=>StatusCode(201,await s.CriarReceitasAsync(r));
     // Aplica este atributo para configurar o comportamento do elemento abaixo.
     [HttpPatch("{id:long}")]
-    public async Task<IActionResult>U(long id,AtualizarReceitaRequest r)=>Ok(await s.AtualizarReceitaAsync(id,r));
+    public async Task<IActionResult>U(long id,long empresaId,AtualizarReceitaRequest r)=>Ok(await s.AtualizarReceitaAsync(id,r,empresaId));
     // Aplica este atributo para configurar o comportamento do elemento abaixo.
     [HttpPost("{id:long}/receber")]
-    public async Task<IActionResult>P(long id,LiquidarRequest? r)=>Ok(await s.ReceberAsync(id,r??new(null,null,null)));
+    public async Task<IActionResult>P(long id,long empresaId,LiquidarRequest? r)=>Ok(await s.ReceberAsync(id,r??new(null,null,null),empresaId));
     // Aplica este atributo para configurar o comportamento do elemento abaixo.
     [HttpPost("{id:long}/estornar")]
-    public async Task<IActionResult>E(long id,CancelarRequest? r)=>Ok(await s.EstornarRecebimentoAsync(id,r?.Motivo));
+    public async Task<IActionResult>E(long id,long empresaId,CancelarRequest? r)=>Ok(await s.EstornarRecebimentoAsync(id,r?.Motivo,empresaId));
     // Aplica este atributo para configurar o comportamento do elemento abaixo.
     [HttpPost("{id:long}/cancelar")]
-    public async Task<IActionResult>X(long id,CancelarRequest? r)=>Ok(await s.CancelarReceitaAsync(id,r?.Motivo));
+    public async Task<IActionResult>X(long id,long empresaId,CancelarRequest? r)=>Ok(await s.CancelarReceitaAsync(id,r?.Motivo,empresaId));
     // Aplica este atributo para configurar o comportamento do elemento abaixo.
     [HttpDelete("{id:long}")]
-    public async Task<IActionResult>D(long id)
+    public async Task<IActionResult>D(long id,long empresaId)
     {
         // Aguarda a conclusão da operação assíncrona antes de seguir para o próximo passo.
-        await s.ExcluirReceitaAsync(id);
+        await s.ExcluirReceitaAsync(id,empresaId);
         // Retorna o resultado calculado para quem chamou este método.
         return NoContent();
     }
     // Aplica este atributo para configurar o comportamento do elemento abaixo.
     [HttpGet("{id:long}/eventos")]
-    public async Task<IActionResult>Ev(long id)=>Ok(await s.EventosAsync("ContaReceber",id));
+    public async Task<IActionResult>Ev(long id,long empresaId)=>Ok(await s.EventosAsync("ContaReceber",id,empresaId));
 }
 // Declara `TransferenciasController`, que representa uma parte do domínio do PayControl.
 [ApiController]
@@ -105,7 +105,7 @@ public sealed class TransferenciasController(FinanceiroService s) : ControllerBa
     public async Task<IActionResult>C(TransferenciaRequest r)=>StatusCode(201,await s.CriarTransferenciaAsync(r));
     // Aplica este atributo para configurar o comportamento do elemento abaixo.
     [HttpPost("{id:long}/cancelar")]
-    public async Task<IActionResult>X(long id,CancelarRequest? r)=>Ok(await s.CancelarTransferenciaAsync(id,r?.Motivo));
+    public async Task<IActionResult>X(long id,long empresaId,CancelarRequest? r)=>Ok(await s.CancelarTransferenciaAsync(id,r?.Motivo,empresaId));
 }
 // Declara `RecorrenciasController`, que representa uma parte do domínio do PayControl.
 [ApiController]
@@ -120,10 +120,10 @@ public sealed class RecorrenciasController(FinanceiroService s) : ControllerBase
     public async Task<IActionResult>C(RecorrenciaRequest r)=>StatusCode(201,await s.CriarRecorrenciaAsync(r));
     // Aplica este atributo para configurar o comportamento do elemento abaixo.
     [HttpPost("processar")]
-    public async Task<IActionResult>P(DateTime? ate)=>Ok(new
+    public async Task<IActionResult>P(DateTime? ate,long empresaId)=>Ok(new
     {
         // Prepara o valor de `gerados` que será usado nas próximas etapas do processamento.
-        gerados=await s.ProcessarRecorrenciasAsync(ate)
+        gerados=await s.ProcessarRecorrenciasAsync(ate,empresaId)
     }
     );
 }

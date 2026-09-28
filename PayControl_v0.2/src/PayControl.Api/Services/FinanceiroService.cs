@@ -69,11 +69,12 @@ public sealed class FinanceiroService(DatabaseService db)
         return l;
     }
     // Define o método `ObterContaPagarAsync` e sua responsabilidade no fluxo da aplicação.
-    public async Task<ContaPagar?> ObterContaPagarAsync(long id)=>(await ListarContasPagarAsync(null,null,null,null,null,null,null,null)).FirstOrDefault(x=>x.Id==id);
+    public async Task<ContaPagar?> ObterContaPagarAsync(long id,long? empresaId=null)=>(await ListarContasPagarAsync(empresaId,null,null,null,null,null,null,null)).FirstOrDefault(x=>x.Id==id);
     // Define o método `CriarContasPagarAsync` e sua responsabilidade no fluxo da aplicação.
     public async Task<IReadOnlyList<ContaPagar>> CriarContasPagarAsync(CriarContaPagarRequest x)
     {
         Validar(x.Descricao,x.Valor,x.DataEmissao,x.DataVencimento,x.Parcelas);
+        await ValidarVinculosPagarAsync(x.EmpresaId,x.FornecedorId,x.CategoriaId,x.ContaFinanceiraId,true);
         // Prepara o valor de `grupo` que será usado nas próximas etapas do processamento.
         var grupo=x.Parcelas>1?Guid.NewGuid().ToString("N"):null;
         // Prepara o valor de `l` que será usado nas próximas etapas do processamento.
@@ -149,10 +150,10 @@ public sealed class FinanceiroService(DatabaseService db)
         return (await ObterContaPagarAsync(id))!;
     }
     // Define o método `AtualizarContaPagarAsync` e sua responsabilidade no fluxo da aplicação.
-    public async Task<ContaPagar> AtualizarContaPagarAsync(long id,AtualizarContaPagarRequest x)
+    public async Task<ContaPagar> AtualizarContaPagarAsync(long id,AtualizarContaPagarRequest x,long? empresaId=null)
     {
         // Prepara o valor de `a` que será usado nas próximas etapas do processamento.
-        var a=await ObterContaPagarAsync(id)??throw new KeyNotFoundException();
+        var a=await ObterContaPagarAsync(id,empresaId)??throw new KeyNotFoundException("Conta a pagar não encontrada para a empresa ativa.");
         // Verifica a condição antes de continuar, evitando que o sistema processe um estado inválido.
         if(a.Status is "Pago" or "Cancelado")throw new InvalidOperationException("Lançamento liquidado/cancelado não pode ser editado; use estorno/cancelamento quando aplicável.");
         // Prepara o valor de `n` que será usado nas próximas etapas do processamento.
@@ -163,6 +164,7 @@ public sealed class FinanceiroService(DatabaseService db)
         }
         ;
         Validar(n.Descricao,n.Valor,n.DataEmissao,n.DataVencimento,1);
+        await ValidarVinculosPagarAsync(a.EmpresaId,n.FornecedorId,n.CategoriaId,n.ContaFinanceiraId,false);
         // Cria uma conexão com o banco de dados usando a configuração central do sistema.
         await using var c=db.CreateConnection();
         // Abre a conexão com o banco antes de executar comandos SQL.
@@ -205,28 +207,31 @@ public sealed class FinanceiroService(DatabaseService db)
         return (await ObterContaPagarAsync(id))!;
     }
     // Define o método `PagarAsync` e sua responsabilidade no fluxo da aplicação.
-    public async Task<ContaPagar> PagarAsync(long id,LiquidarRequest x)
+    public async Task<ContaPagar> PagarAsync(long id,LiquidarRequest x,long? empresaId=null)
     {
         // Prepara o valor de `a` que será usado nas próximas etapas do processamento.
-        var a=await ObterContaPagarAsync(id)??throw new KeyNotFoundException();
+        var a=await ObterContaPagarAsync(id,empresaId)??throw new KeyNotFoundException("Conta a pagar não encontrada para a empresa ativa.");
         // Verifica a condição antes de continuar, evitando que o sistema processe um estado inválido.
         if(a.Status=="Pago")throw new InvalidOperationException("Conta já paga.");
         // Verifica a condição antes de continuar, evitando que o sistema processe um estado inválido.
         if(a.Status=="Cancelado")throw new InvalidOperationException("Conta cancelada.");
         // Prepara o valor de `data` que será usado nas próximas etapas do processamento.
         var data=x.Data??DateTime.Today;
+        var contaPagamento=x.ContaFinanceiraId??a.ContaFinanceiraId;
+        if(!contaPagamento.HasValue)throw new ArgumentException("Conta financeira é obrigatória para registrar o pagamento.");
+        await ValidarContaFinanceiraDaEmpresaAsync(a.EmpresaId,contaPagamento.Value,true);
         // Aguarda a conclusão da operação assíncrona antes de seguir para o próximo passo.
-        await UpdateStatus("contas_pagar",id,"Pago","data_pagamento",data,x.ContaFinanceiraId,x.FormaPagamento,"forma_pagamento");
+        await UpdateStatus("contas_pagar",id,"Pago","data_pagamento",data,contaPagamento,x.FormaPagamento,"forma_pagamento");
         // Retorna o resultado calculado para quem chamou este método.
         return (await ObterContaPagarAsync(id))!;
     }
     // Define o método `CancelarContaAsync` e sua responsabilidade no fluxo da aplicação.
-    public Task<ContaPagar> CancelarContaAsync(long id,string? m)=>CancelPagar(id,m);
+    public Task<ContaPagar> CancelarContaAsync(long id,string? m,long? empresaId=null)=>CancelPagar(id,m,empresaId);
     // Define o método `CancelPagar` e sua responsabilidade no fluxo da aplicação.
-    async Task<ContaPagar> CancelPagar(long id,string? m)
+    async Task<ContaPagar> CancelPagar(long id,string? m,long? empresaId=null)
     {
         // Prepara o valor de `a` que será usado nas próximas etapas do processamento.
-        var a=await ObterContaPagarAsync(id)??throw new KeyNotFoundException();
+        var a=await ObterContaPagarAsync(id,empresaId)??throw new KeyNotFoundException("Conta a pagar não encontrada para a empresa ativa.");
         // Verifica a condição antes de continuar, evitando que o sistema processe um estado inválido.
         if(a.Status=="Pago")throw new InvalidOperationException("Conta paga deve ser estornada antes do cancelamento.");
         // Aguarda a conclusão da operação assíncrona antes de seguir para o próximo passo.
@@ -235,10 +240,10 @@ public sealed class FinanceiroService(DatabaseService db)
         return (await ObterContaPagarAsync(id))!;
     }
     // Define o método `EstornarPagamentoAsync` e sua responsabilidade no fluxo da aplicação.
-    public async Task<ContaPagar> EstornarPagamentoAsync(long id,string? motivo)
+    public async Task<ContaPagar> EstornarPagamentoAsync(long id,string? motivo,long? empresaId=null)
     {
         // Prepara o valor de `a` que será usado nas próximas etapas do processamento.
-        var a=await ObterContaPagarAsync(id)??throw new KeyNotFoundException();
+        var a=await ObterContaPagarAsync(id,empresaId)??throw new KeyNotFoundException("Conta a pagar não encontrada para a empresa ativa.");
         // Verifica a condição antes de continuar, evitando que o sistema processe um estado inválido.
         if(a.Status!="Pago")throw new InvalidOperationException("Apenas conta paga pode ser estornada.");
         // Cria uma conexão com o banco de dados usando a configuração central do sistema.
@@ -259,10 +264,10 @@ public sealed class FinanceiroService(DatabaseService db)
         return (await ObterContaPagarAsync(id))!;
     }
     // Define o método `ExcluirContaAsync` e sua responsabilidade no fluxo da aplicação.
-    public async Task ExcluirContaAsync(long id)
+    public async Task ExcluirContaAsync(long id,long? empresaId=null)
     {
         // Prepara o valor de `a` que será usado nas próximas etapas do processamento.
-        var a=await ObterContaPagarAsync(id)??throw new KeyNotFoundException();
+        var a=await ObterContaPagarAsync(id,empresaId)??throw new KeyNotFoundException("Conta a pagar não encontrada para a empresa ativa.");
         // Verifica a condição antes de continuar, evitando que o sistema processe um estado inválido.
         if(a.Status is "Pago" or "Cancelado")throw new InvalidOperationException("Lançamentos liquidados/cancelados são preservados. Use estorno/cancelamento.");
         // Aguarda a conclusão da operação assíncrona antes de seguir para o próximo passo.
@@ -318,11 +323,12 @@ public sealed class FinanceiroService(DatabaseService db)
         return l;
     }
     // Define o método `ObterReceitaAsync` e sua responsabilidade no fluxo da aplicação.
-    public async Task<ContaReceber?> ObterReceitaAsync(long id)=>(await ListarReceitasAsync(null,null,null,null,null,null,null,null,null)).FirstOrDefault(x=>x.Id==id);
+    public async Task<ContaReceber?> ObterReceitaAsync(long id,long? empresaId=null)=>(await ListarReceitasAsync(empresaId,null,null,null,null,null,null,null,null)).FirstOrDefault(x=>x.Id==id);
     // Define o método `CriarReceitasAsync` e sua responsabilidade no fluxo da aplicação.
     public async Task<IReadOnlyList<ContaReceber>> CriarReceitasAsync(CriarReceitaRequest x)
     {
         Validar(x.Descricao,x.Valor,x.DataEmissao,x.DataVencimento,x.Parcelas);
+        await ValidarVinculosReceberAsync(x.EmpresaId,x.ClienteId,x.CategoriaId,x.ContaFinanceiraId,true);
         // Prepara o valor de `tipo` que será usado nas próximas etapas do processamento.
         var tipo=x.Tipo.Trim().ToLowerInvariant() switch
         {
@@ -407,10 +413,10 @@ public sealed class FinanceiroService(DatabaseService db)
         return (await ObterReceitaAsync(id))!;
     }
     // Define o método `AtualizarReceitaAsync` e sua responsabilidade no fluxo da aplicação.
-    public async Task<ContaReceber> AtualizarReceitaAsync(long id,AtualizarReceitaRequest x)
+    public async Task<ContaReceber> AtualizarReceitaAsync(long id,AtualizarReceitaRequest x,long? empresaId=null)
     {
         // Prepara o valor de `a` que será usado nas próximas etapas do processamento.
-        var a=await ObterReceitaAsync(id)??throw new KeyNotFoundException();
+        var a=await ObterReceitaAsync(id,empresaId)??throw new KeyNotFoundException("Conta a receber não encontrada para a empresa ativa.");
         // Verifica a condição antes de continuar, evitando que o sistema processe um estado inválido.
         if(a.Status is "Recebido" or "Cancelado")throw new InvalidOperationException("Lançamento liquidado/cancelado não pode ser editado.");
         // Prepara o valor de `n` que será usado nas próximas etapas do processamento.
@@ -421,6 +427,7 @@ public sealed class FinanceiroService(DatabaseService db)
         }
         ;
         Validar(n.Descricao,n.Valor,n.DataEmissao,n.DataVencimento,1);
+        await ValidarVinculosReceberAsync(a.EmpresaId,n.ClienteId,n.CategoriaId,n.ContaFinanceiraId,false);
         // Cria uma conexão com o banco de dados usando a configuração central do sistema.
         await using var c=db.CreateConnection();
         // Abre a conexão com o banco antes de executar comandos SQL.
@@ -465,24 +472,27 @@ public sealed class FinanceiroService(DatabaseService db)
         return (await ObterReceitaAsync(id))!;
     }
     // Define o método `ReceberAsync` e sua responsabilidade no fluxo da aplicação.
-    public async Task<ContaReceber> ReceberAsync(long id,LiquidarRequest x)
+    public async Task<ContaReceber> ReceberAsync(long id,LiquidarRequest x,long? empresaId=null)
     {
         // Prepara o valor de `a` que será usado nas próximas etapas do processamento.
-        var a=await ObterReceitaAsync(id)??throw new KeyNotFoundException();
+        var a=await ObterReceitaAsync(id,empresaId)??throw new KeyNotFoundException("Conta a receber não encontrada para a empresa ativa.");
         // Verifica a condição antes de continuar, evitando que o sistema processe um estado inválido.
         if(a.Status=="Recebido")throw new InvalidOperationException("Receita já recebida.");
         // Verifica a condição antes de continuar, evitando que o sistema processe um estado inválido.
         if(a.Status=="Cancelado")throw new InvalidOperationException("Receita cancelada.");
+        var contaRecebimento=x.ContaFinanceiraId??a.ContaFinanceiraId;
+        if(!contaRecebimento.HasValue)throw new ArgumentException("Conta financeira é obrigatória para registrar o recebimento.");
+        await ValidarContaFinanceiraDaEmpresaAsync(a.EmpresaId,contaRecebimento.Value,true);
         // Aguarda a conclusão da operação assíncrona antes de seguir para o próximo passo.
-        await UpdateStatus("contas_receber",id,"Recebido","data_recebimento",x.Data??DateTime.Today,x.ContaFinanceiraId,x.FormaPagamento,"forma_recebimento");
+        await UpdateStatus("contas_receber",id,"Recebido","data_recebimento",x.Data??DateTime.Today,contaRecebimento,x.FormaPagamento,"forma_recebimento");
         // Retorna o resultado calculado para quem chamou este método.
         return (await ObterReceitaAsync(id))!;
     }
     // Define o método `EstornarRecebimentoAsync` e sua responsabilidade no fluxo da aplicação.
-    public async Task<ContaReceber> EstornarRecebimentoAsync(long id,string? motivo)
+    public async Task<ContaReceber> EstornarRecebimentoAsync(long id,string? motivo,long? empresaId=null)
     {
         // Prepara o valor de `a` que será usado nas próximas etapas do processamento.
-        var a=await ObterReceitaAsync(id)??throw new KeyNotFoundException();
+        var a=await ObterReceitaAsync(id,empresaId)??throw new KeyNotFoundException("Conta a receber não encontrada para a empresa ativa.");
         // Verifica a condição antes de continuar, evitando que o sistema processe um estado inválido.
         if(a.Status!="Recebido")throw new InvalidOperationException("Apenas receita recebida pode ser estornada.");
         // Cria uma conexão com o banco de dados usando a configuração central do sistema.
@@ -503,10 +513,10 @@ public sealed class FinanceiroService(DatabaseService db)
         return (await ObterReceitaAsync(id))!;
     }
     // Define o método `CancelarReceitaAsync` e sua responsabilidade no fluxo da aplicação.
-    public async Task<ContaReceber> CancelarReceitaAsync(long id,string? m)
+    public async Task<ContaReceber> CancelarReceitaAsync(long id,string? m,long? empresaId=null)
     {
         // Prepara o valor de `a` que será usado nas próximas etapas do processamento.
-        var a=await ObterReceitaAsync(id)??throw new KeyNotFoundException();
+        var a=await ObterReceitaAsync(id,empresaId)??throw new KeyNotFoundException("Conta a receber não encontrada para a empresa ativa.");
         // Verifica a condição antes de continuar, evitando que o sistema processe um estado inválido.
         if(a.Status=="Recebido")throw new InvalidOperationException("Receita recebida deve ser estornada antes do cancelamento.");
         // Aguarda a conclusão da operação assíncrona antes de seguir para o próximo passo.
@@ -515,10 +525,10 @@ public sealed class FinanceiroService(DatabaseService db)
         return (await ObterReceitaAsync(id))!;
     }
     // Define o método `ExcluirReceitaAsync` e sua responsabilidade no fluxo da aplicação.
-    public async Task ExcluirReceitaAsync(long id)
+    public async Task ExcluirReceitaAsync(long id,long? empresaId=null)
     {
         // Prepara o valor de `a` que será usado nas próximas etapas do processamento.
-        var a=await ObterReceitaAsync(id)??throw new KeyNotFoundException();
+        var a=await ObterReceitaAsync(id,empresaId)??throw new KeyNotFoundException("Conta a receber não encontrada para a empresa ativa.");
         // Verifica a condição antes de continuar, evitando que o sistema processe um estado inválido.
         if(a.Status is "Recebido" or "Cancelado")throw new InvalidOperationException("Lançamentos liquidados/cancelados são preservados.");
         // Aguarda a conclusão da operação assíncrona antes de seguir para o próximo passo.
@@ -551,54 +561,66 @@ public sealed class FinanceiroService(DatabaseService db)
     // Define o método `CriarTransferenciaAsync` e sua responsabilidade no fluxo da aplicação.
     public async Task<Transferencia> CriarTransferenciaAsync(TransferenciaRequest x)
     {
-        // Verifica a condição antes de continuar, evitando que o sistema processe um estado inválido.
-        if(x.ContaOrigemId==x.ContaDestinoId)throw new ArgumentException("Contas devem ser diferentes.");
-        // Verifica a condição antes de continuar, evitando que o sistema processe um estado inválido.
-        if(x.Valor<=0)throw new ArgumentException("Valor inválido.");
-        // Cria uma conexão com o banco de dados usando a configuração central do sistema.
+        if(x.ContaOrigemId==x.ContaDestinoId)throw new ArgumentException("A conta de origem deve ser diferente da conta de destino.");
+        if(x.Valor<=0)throw new ArgumentException("O valor da transferência deve ser maior que zero.");
+
+        var empresa=await ExigirEmpresaAtivaAsync(x.EmpresaId);
+        await ValidarContaFinanceiraDaEmpresaAsync(empresa,x.ContaOrigemId,true);
+        await ValidarContaFinanceiraDaEmpresaAsync(empresa,x.ContaDestinoId,true);
+
+        // Impede que a transferência deixe a conta de origem com saldo negativo.
+        var saldoOrigem=await ObterSaldoContaAsync(empresa,x.ContaOrigemId);
+        if(x.Valor>saldoOrigem)
+        {
+            throw new InvalidOperationException(
+                $"Saldo insuficiente na conta de origem. Saldo disponível: R$ {saldoOrigem:N2}."
+            );
+        }
+
         await using var c=db.CreateConnection();
-        // Abre a conexão com o banco antes de executar comandos SQL.
         await c.OpenAsync();
-        // Prepara o valor de `q` que será usado nas próximas etapas do processamento.
         var q=c.CreateCommand();
-        // Define o comando SQL que será executado no banco SQLite.
         q.CommandText="INSERT INTO transferencias(empresa_id,conta_origem_id,conta_destino_id,valor,data,descricao) VALUES($e,$o,$d,$v,$dt,$ds);SELECT last_insert_rowid();";
-        // Associa o valor ao parâmetro SQL, mantendo a consulta parametrizada.
-        P(q,"$e",x.EmpresaId);
-        // Associa o valor ao parâmetro SQL, mantendo a consulta parametrizada.
+        P(q,"$e",empresa);
         P(q,"$o",x.ContaOrigemId);
-        // Associa o valor ao parâmetro SQL, mantendo a consulta parametrizada.
         P(q,"$d",x.ContaDestinoId);
-        // Associa o valor ao parâmetro SQL, mantendo a consulta parametrizada.
         P(q,"$v",x.Valor);
-        // Associa o valor ao parâmetro SQL, mantendo a consulta parametrizada.
         P(q,"$dt",DatabaseService.Date(x.Data));
-        // Associa o valor ao parâmetro SQL, mantendo a consulta parametrizada.
         P(q,"$ds",x.Descricao);
-        // Executa o comando e recupera o valor único retornado pela consulta.
         var id=Convert.ToInt64(await q.ExecuteScalarAsync());
-        // Retorna o resultado calculado para quem chamou este método.
-        return (await ListarTransferenciasAsync(null,null)).First(z=>z.Id==id);
+        return (await ListarTransferenciasAsync(empresa,null)).First(z=>z.Id==id);
     }
     // Define o método `CancelarTransferenciaAsync` e sua responsabilidade no fluxo da aplicação.
-    public async Task<Transferencia> CancelarTransferenciaAsync(long id,string? motivo)
+    public async Task<Transferencia> CancelarTransferenciaAsync(long id,string? motivo,long? empresaId=null)
     {
-        // Cria uma conexão com o banco de dados usando a configuração central do sistema.
+        var transferencia=(await ListarTransferenciasAsync(empresaId,null)).FirstOrDefault(x=>x.Id==id)
+            ?? throw new KeyNotFoundException("Transferência não encontrada.");
+
+        if(transferencia.Status=="Cancelada")
+        {
+            throw new InvalidOperationException("Transferência já cancelada.");
+        }
+
+        var empresa=await ExigirEmpresaAtivaAsync(transferencia.EmpresaId);
+
+        // O cancelamento retira o valor da conta de destino. Para manter a
+        // regra de saldo não negativo, o destino precisa possuir esse valor.
+        var saldoDestino=await ObterSaldoContaAsync(empresa,transferencia.ContaDestinoId);
+        if(transferencia.Valor>saldoDestino)
+        {
+            throw new InvalidOperationException(
+                $"Não é possível cancelar a transferência porque a conta de destino possui apenas R$ {saldoDestino:N2} disponíveis."
+            );
+        }
+
         await using var c=db.CreateConnection();
-        // Abre a conexão com o banco antes de executar comandos SQL.
         await c.OpenAsync();
-        // Prepara o valor de `q` que será usado nas próximas etapas do processamento.
         var q=c.CreateCommand();
-        // Define o comando SQL que será executado no banco SQLite.
         q.CommandText="UPDATE transferencias SET status='Cancelada',motivo_cancelamento=$m WHERE id=$id AND status<>'Cancelada'";
-        // Associa o valor ao parâmetro SQL, mantendo a consulta parametrizada.
         P(q,"$m",motivo);
-        // Associa o valor ao parâmetro SQL, mantendo a consulta parametrizada.
         P(q,"$id",id);
-        // Verifica a condição antes de continuar, evitando que o sistema processe um estado inválido.
         if(await q.ExecuteNonQueryAsync()==0)throw new InvalidOperationException("Transferência não encontrada ou já cancelada.");
-        // Retorna o resultado calculado para quem chamou este método.
-        return (await ListarTransferenciasAsync(null,null)).First(x=>x.Id==id);
+        return (await ListarTransferenciasAsync(empresa,null)).First(x=>x.Id==id);
     }
     // Define o método `ListarRecorrenciasAsync` e sua responsabilidade no fluxo da aplicação.
     public async Task<IReadOnlyList<Recorrencia>> ListarRecorrenciasAsync(long? empresa)
@@ -628,6 +650,7 @@ public sealed class FinanceiroService(DatabaseService db)
     // Define o método `CriarRecorrenciaAsync` e sua responsabilidade no fluxo da aplicação.
     public async Task<Recorrencia> CriarRecorrenciaAsync(RecorrenciaRequest x)
     {
+        await ValidarRecorrenciaAsync(x.EmpresaId,x.Natureza,x.ClienteId,x.FornecedorId,x.CategoriaId,x.ContaFinanceiraId);
         // Prepara o valor de `id` que será usado nas próximas etapas do processamento.
         var id=await CriarRecorrenciaInterna(x.EmpresaId,x.Natureza,x.Descricao,x.Valor,x.Frequencia,x.ProximaData,x.DataFim,x.ClienteId,x.FornecedorId,x.CategoriaId,x.ContaFinanceiraId,x.TipoReceita,x.FormaPagamento);
         // Retorna o resultado calculado para quem chamou este método.
@@ -675,12 +698,12 @@ public sealed class FinanceiroService(DatabaseService db)
         return Convert.ToInt64(await q.ExecuteScalarAsync());
     }
     // Define o método `ProcessarRecorrenciasAsync` e sua responsabilidade no fluxo da aplicação.
-    public async Task<int> ProcessarRecorrenciasAsync(DateTime? ate)
+    public async Task<int> ProcessarRecorrenciasAsync(DateTime? ate,long? empresaId=null)
     {
         // Prepara o valor de `limite` que será usado nas próximas etapas do processamento.
         var limite=(ate??DateTime.Today).Date;
         // Prepara o valor de `rec` que será usado nas próximas etapas do processamento.
-        var rec=(await ListarRecorrenciasAsync(null)).Where(x=>x.Ativa).ToList();
+        var rec=(await ListarRecorrenciasAsync(empresaId)).Where(x=>x.Ativa).ToList();
         // Prepara o valor de `n` que será usado nas próximas etapas do processamento.
         int n=0;
         // Percorre a sequência necessária para processar todos os itens deste fluxo.
@@ -730,8 +753,20 @@ public sealed class FinanceiroService(DatabaseService db)
         return n;
     }
     // Define o método `EventosAsync` e sua responsabilidade no fluxo da aplicação.
-    public async Task<IReadOnlyList<EventoFinanceiro>> EventosAsync(string entidade,long id)
+    public async Task<IReadOnlyList<EventoFinanceiro>> EventosAsync(string entidade,long id,long? empresaId=null)
     {
+        if(empresaId.HasValue)
+        {
+            var existe=entidade.Equals("ContaPagar",StringComparison.OrdinalIgnoreCase)
+                ? await ObterContaPagarAsync(id,empresaId) is not null
+                : entidade.Equals("ContaReceber",StringComparison.OrdinalIgnoreCase)
+                    ? await ObterReceitaAsync(id,empresaId) is not null
+                    : false;
+
+            if(!existe)
+                throw new KeyNotFoundException("Lançamento não encontrado para a empresa ativa.");
+        }
+
         // Prepara o valor de `l` que será usado nas próximas etapas do processamento.
         var l=new List<EventoFinanceiro>();
         // Cria uma conexão com o banco de dados usando a configuração central do sistema.
@@ -835,6 +870,134 @@ public sealed class FinanceiroService(DatabaseService db)
         // Executa o comando de alteração no banco e aguarda sua conclusão.
         await q.ExecuteNonQueryAsync();
     }
+    /*
+     * ============================================================
+     * INTEGRIDADE MULTIEMPRESA
+     * ============================================================
+     */
+    async Task<long> ExigirEmpresaAtivaAsync(long? empresaId)
+    {
+        if(!empresaId.HasValue)throw new ArgumentException("Empresa é obrigatória.");
+
+        await using var c=db.CreateConnection();
+        await c.OpenAsync();
+        var q=c.CreateCommand();
+        q.CommandText="SELECT COUNT(*) FROM empresas WHERE id=$id AND ativa=1";
+        P(q,"$id",empresaId.Value);
+
+        if(Convert.ToInt32(await q.ExecuteScalarAsync())==0)
+            throw new ArgumentException("A empresa informada não existe ou está inativa.");
+
+        return empresaId.Value;
+    }
+
+    async Task ValidarVinculoEmpresaAsync(long empresaId,string table,long? id,string entidade,bool exigirAtivo,string? ativoCol="ativo")
+    {
+        if(!id.HasValue)return;
+
+        await using var c=db.CreateConnection();
+        await c.OpenAsync();
+        var q=c.CreateCommand();
+
+        var filtroAtivo=exigirAtivo && !string.IsNullOrWhiteSpace(ativoCol)
+            ? $" AND {ativoCol}=1"
+            : string.Empty;
+
+        q.CommandText=$"SELECT COUNT(*) FROM {table} WHERE id=$id AND empresa_id=$empresa{filtroAtivo}";
+        P(q,"$id",id.Value);
+        P(q,"$empresa",empresaId);
+
+        if(Convert.ToInt32(await q.ExecuteScalarAsync())==0)
+            throw new ArgumentException($"{entidade} não pertence à empresa ativa, não existe ou está inativo.");
+    }
+
+    async Task ValidarCategoriaFinanceiraAsync(long empresaId,long? categoriaId,string tipoEsperado,bool exigirAtiva)
+    {
+        if(!categoriaId.HasValue)return;
+
+        await using var c=db.CreateConnection();
+        await c.OpenAsync();
+        var q=c.CreateCommand();
+        q.CommandText="SELECT COUNT(*) FROM categorias WHERE id=$id AND empresa_id=$empresa AND lower(tipo)=lower($tipo) AND ($exigirAtiva=0 OR ativa=1)";
+        P(q,"$id",categoriaId.Value);
+        P(q,"$empresa",empresaId);
+        P(q,"$tipo",tipoEsperado);
+        P(q,"$exigirAtiva",exigirAtiva?1:0);
+
+        if(Convert.ToInt32(await q.ExecuteScalarAsync())==0)
+            throw new ArgumentException($"A conta do Plano de Contas deve pertencer à empresa ativa e ser do tipo {tipoEsperado}.");
+    }
+
+    async Task ValidarContaFinanceiraDaEmpresaAsync(long? empresaId,long contaId,bool exigirAtiva)
+    {
+        var empresa=await ExigirEmpresaAtivaAsync(empresaId);
+        await ValidarVinculoEmpresaAsync(empresa,"contas_financeiras",contaId,"Conta financeira",exigirAtiva,"ativa");
+    }
+
+    async Task ValidarVinculosPagarAsync(long? empresaId,long? fornecedorId,long? categoriaId,long? contaId,bool exigirAtivos)
+    {
+        var empresa=await ExigirEmpresaAtivaAsync(empresaId);
+        await ValidarVinculoEmpresaAsync(empresa,"fornecedores",fornecedorId,"Fornecedor",exigirAtivos,"ativo");
+        await ValidarCategoriaFinanceiraAsync(empresa,categoriaId,"Despesa",exigirAtivos);
+        if(contaId.HasValue)await ValidarContaFinanceiraDaEmpresaAsync(empresa,contaId.Value,exigirAtivos);
+    }
+
+    async Task ValidarVinculosReceberAsync(long? empresaId,long? clienteId,long? categoriaId,long? contaId,bool exigirAtivos)
+    {
+        var empresa=await ExigirEmpresaAtivaAsync(empresaId);
+        await ValidarVinculoEmpresaAsync(empresa,"clientes",clienteId,"Cliente",exigirAtivos,"ativo");
+        await ValidarCategoriaFinanceiraAsync(empresa,categoriaId,"Receita",exigirAtivos);
+        if(contaId.HasValue)await ValidarContaFinanceiraDaEmpresaAsync(empresa,contaId.Value,exigirAtivos);
+    }
+
+    async Task ValidarRecorrenciaAsync(long? empresaId,string natureza,long? clienteId,long? fornecedorId,long? categoriaId,long? contaId)
+    {
+        var empresa=await ExigirEmpresaAtivaAsync(empresaId);
+        var normalizada=natureza.Trim().ToLowerInvariant();
+
+        if(normalizada=="pagar")
+        {
+            if(clienteId.HasValue)throw new ArgumentException("Recorrência a pagar não pode possuir cliente.");
+            await ValidarVinculoEmpresaAsync(empresa,"fornecedores",fornecedorId,"Fornecedor",true,"ativo");
+            await ValidarCategoriaFinanceiraAsync(empresa,categoriaId,"Despesa",true);
+        }
+        else if(normalizada=="receber")
+        {
+            if(fornecedorId.HasValue)throw new ArgumentException("Recorrência a receber não pode possuir fornecedor.");
+            await ValidarVinculoEmpresaAsync(empresa,"clientes",clienteId,"Cliente",true,"ativo");
+            await ValidarCategoriaFinanceiraAsync(empresa,categoriaId,"Receita",true);
+        }
+        else
+        {
+            throw new ArgumentException("Natureza da recorrência deve ser Pagar ou Receber.");
+        }
+
+        if(contaId.HasValue)await ValidarContaFinanceiraDaEmpresaAsync(empresa,contaId.Value,true);
+    }
+
+    async Task<decimal> ObterSaldoContaAsync(long empresaId,long contaId)
+    {
+        await using var c=db.CreateConnection();
+        await c.OpenAsync();
+        var q=c.CreateCommand();
+        q.CommandText="""
+            SELECT
+                cf.saldo_inicial
+                + COALESCE((SELECT SUM(valor) FROM contas_receber WHERE empresa_id=$empresa AND conta_financeira_id=cf.id AND status='Recebido'),0)
+                - COALESCE((SELECT SUM(valor) FROM contas_pagar WHERE empresa_id=$empresa AND conta_financeira_id=cf.id AND status='Pago'),0)
+                + COALESCE((SELECT SUM(valor) FROM transferencias WHERE empresa_id=$empresa AND conta_destino_id=cf.id AND status='Efetivada'),0)
+                - COALESCE((SELECT SUM(valor) FROM transferencias WHERE empresa_id=$empresa AND conta_origem_id=cf.id AND status='Efetivada'),0)
+            FROM contas_financeiras cf
+            WHERE cf.id=$conta AND cf.empresa_id=$empresa;
+            """;
+        P(q,"$empresa",empresaId);
+        P(q,"$conta",contaId);
+
+        var valor=await q.ExecuteScalarAsync();
+        if(valor is null or DBNull)throw new ArgumentException("Conta financeira não pertence à empresa ativa.");
+        return Convert.ToDecimal(valor);
+    }
+
     // Define o método `Validar` e sua responsabilidade no fluxo da aplicação.
     static void Validar(string d,decimal v,DateTime e,DateTime venc,int parcelas)
     {
